@@ -136,7 +136,7 @@ function PersonChip({ person, onAdd, existingIds, addingId }) {
         }`}
       onClick={(e) => { e.stopPropagation(); if (!already && !addingId) onAdd(person); }}
       disabled={already || !!addingId}
-      title={already ? "Already on timeline" : "Add to timeline"}
+      title={already ? "Already on timeline" : person.description ? `${person.description.charAt(0).toUpperCase() + person.description.slice(1)} — Add to timeline` : "Add to timeline"}
     >
       {loading && <span className="loading loading-spinner loading-xs" />}
       {person.name}

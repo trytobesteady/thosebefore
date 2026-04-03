@@ -223,7 +223,7 @@ LIMIT 200
     const params = new URLSearchParams({
       action: "wbgetentities",
       ids: batch.join("|"),
-      props: "labels|sitelinks",
+      props: "labels|descriptions|sitelinks",
       languages: "en",
       format: "json",
       origin: "*",
@@ -238,6 +238,7 @@ LIMIT 200
     .map((e) => ({
       id: e.id,
       name: e.labels?.en?.value || e.id,
+      description: e.descriptions?.en?.value || "",
       sitelinks: e.sitelinks ? Object.keys(e.sitelinks).length : 0,
     }))
     .sort((a, b) => b.sitelinks - a.sitelinks)
