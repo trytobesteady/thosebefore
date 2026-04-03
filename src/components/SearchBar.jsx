@@ -75,47 +75,43 @@ export default function SearchBar({ onAdd, existingIds }) {
       </div>
 
       {showFilters && (
-        <div className="mt-2 p-3 bg-base-200 rounded-lg flex flex-wrap gap-3 text-sm">
-          <label className="flex items-center gap-1">
-            <span className="text-base-content/60 whitespace-nowrap">Geb. von</span>
+        <div className="mt-2 p-3 bg-base-200 rounded-lg flex flex-col gap-2 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-base-content/60 w-16 shrink-0">Geburt</span>
             <input
               type="number"
               className="input input-bordered input-xs w-24"
-              placeholder="z.B. 1400"
+              placeholder="von"
               value={filters.birthYearMin}
               onChange={(e) => updateFilter("birthYearMin", e.target.value)}
             />
-          </label>
-          <label className="flex items-center gap-1">
-            <span className="text-base-content/60 whitespace-nowrap">bis</span>
+            <span className="text-base-content/40 text-xs">–</span>
             <input
               type="number"
               className="input input-bordered input-xs w-24"
-              placeholder="z.B. 1600"
+              placeholder="bis"
               value={filters.birthYearMax}
               onChange={(e) => updateFilter("birthYearMax", e.target.value)}
             />
-          </label>
-          <label className="flex items-center gap-1">
-            <span className="text-base-content/60 whitespace-nowrap">Tod von</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-base-content/60 w-16 shrink-0">Tod</span>
             <input
               type="number"
               className="input input-bordered input-xs w-24"
-              placeholder="z.B. 1500"
+              placeholder="von"
               value={filters.deathYearMin}
               onChange={(e) => updateFilter("deathYearMin", e.target.value)}
             />
-          </label>
-          <label className="flex items-center gap-1">
-            <span className="text-base-content/60 whitespace-nowrap">bis</span>
+            <span className="text-base-content/40 text-xs">–</span>
             <input
               type="number"
               className="input input-bordered input-xs w-24"
-              placeholder="z.B. 1700"
+              placeholder="bis"
               value={filters.deathYearMax}
               onChange={(e) => updateFilter("deathYearMax", e.target.value)}
             />
-          </label>
+          </div>
         </div>
       )}
 
