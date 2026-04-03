@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import SearchBar from "./components/SearchBar";
 import TimelineCanvas from "./components/TimelineCanvas";
 import { useTimeline } from "./hooks/useTimeline";
@@ -10,12 +10,18 @@ export default function App() {
 
   const existingIds = useMemo(() => new Set(persons.map((p) => p.id)), [persons]);
 
+  // Keep URL in sync with current persons
+  useEffect(() => {
+    if (loadingState) return; // don't overwrite URL while initial load is still running
+    const stateStr = encodeState(persons);
+    window.history.replaceState(null, "", stateStr || window.location.pathname);
+  }, [persons, loadingState]);
+
   async function handleShare() {
     const stateStr = encodeState(persons);
     const url = window.location.origin + window.location.pathname + stateStr;
     try {
       await navigator.clipboard.writeText(url);
-      window.history.replaceState(null, "", stateStr || window.location.pathname);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
