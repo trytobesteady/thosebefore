@@ -56,7 +56,7 @@ function CollapsibleSection({ title, loading, defaultOpen = false, children, rig
   );
 }
 
-function TooltipBox({ pos, onMouseEnter, onMouseLeave, children }) {
+function TooltipBox({ pos, onMouseEnter, onMouseLeave, onClose, children }) {
   const ref = useRef(null);
   const [style, setStyle] = useState({ visibility: "hidden", left: 0, top: 0 });
 
@@ -95,6 +95,15 @@ function TooltipBox({ pos, onMouseEnter, onMouseLeave, children }) {
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
+      <button
+        className="absolute top-2 right-2 text-base-content/30 hover:text-base-content/70 transition-colors leading-none"
+        onClick={(e) => { e.stopPropagation(); onClose(); }}
+        aria-label="Schließen"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
       {children}
     </div>
   );
@@ -215,7 +224,7 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
       )}
 
       {tooltipPos && createPortal(
-        <TooltipBox pos={tooltipPos} onMouseEnter={cancelHide} onMouseLeave={scheduleHide}>
+        <TooltipBox pos={tooltipPos} onMouseEnter={cancelHide} onMouseLeave={scheduleHide} onClose={() => setTooltipPos(null)}>
 
           {/* Header */}
           <div className="font-semibold text-sm mb-1">{person.name}</div>
