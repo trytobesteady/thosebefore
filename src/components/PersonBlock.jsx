@@ -71,7 +71,7 @@ function CollapsibleSection({ title, loading, defaultOpen = false, children, rig
   );
 }
 
-function TooltipBox({ pos, onMouseEnter, onMouseLeave, onClose, children }) {
+function TooltipBox({ pos, onClose, children }) {
   const ref = useRef(null);
   const [style, setStyle] = useState({ visibility: "hidden", left: 0, top: 0 });
 
@@ -107,8 +107,7 @@ function TooltipBox({ pos, onMouseEnter, onMouseLeave, onClose, children }) {
         maxHeight: `calc(100vh - ${MARGIN * 2}px)`,
         overflowY: "auto",
       }}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
+      onClick={(e) => e.stopPropagation()}
     >
       <button
         className="absolute top-2 right-2 text-base-content/30 hover:text-base-content/70 transition-colors leading-none"
@@ -167,7 +166,6 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
 
   const [addingId, setAddingId] = useState(null);
   const blockRef = useRef(null);
-  const hideTimerRef = useRef(null);
   const color = getColorForId(person.id);
 
   const bYear = person.birthYear ?? startYear;
@@ -184,12 +182,14 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
   const showInitials = !showName && widthPx > 20 && !showImage;
   const labelContent = showName ? person.name : showInitials ? initials : null;
 
-  function scheduleHide() { hideTimerRef.current = setTimeout(() => setTooltipPos(null), 200); }
-  function cancelHide() { clearTimeout(hideTimerRef.current); }
-  function showTooltip() {
-    cancelHide();
-    const rect = blockRef.current?.getBoundingClientRect();
-    if (rect) setTooltipPos({ blockTop: rect.top, blockBottom: rect.bottom, blockMidX: rect.left + rect.width / 2 });
+  function toggleTooltip(e) {
+    e.stopPropagation();
+    if (tooltipPos) {
+      setTooltipPos(null);
+    } else {
+      const rect = blockRef.current?.getBoundingClientRect();
+      if (rect) setTooltipPos({ blockTop: rect.top, blockBottom: rect.bottom, blockMidX: rect.left + rect.width / 2 });
+    }
   }
 
   // Fetch image on first tooltip open (cached across hovers)
@@ -243,9 +243,7 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
       className="absolute top-1 bottom-1 rounded-lg cursor-pointer select-none flex items-center overflow-hidden transition-opacity hover:opacity-90"
       style={{ left: leftPx, width: widthPx, backgroundColor: color.bg, minWidth: 4 }}
       ref={blockRef}
-      onMouseEnter={showTooltip}
-      onMouseLeave={scheduleHide}
-      onClick={() => window.open(wikiUrl, "_blank")}
+      onClick={toggleTooltip}
     >
       {(showImage || labelContent) && (
         <div className="flex items-center gap-1 px-1.5 w-full pointer-events-none overflow-hidden">
@@ -269,7 +267,9 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
       )}
 
       {tooltipPos && createPortal(
-        <TooltipBox pos={tooltipPos} onMouseEnter={cancelHide} onMouseLeave={scheduleHide} onClose={() => setTooltipPos(null)}>
+        <>
+          <div className="fixed inset-0 z-[9998]" onClick={() => setTooltipPos(null)} />
+          <TooltipBox pos={tooltipPos} onClose={() => setTooltipPos(null)}>
 
           {/* Header */}
           <div className="flex items-center gap-2 mb-1 pr-5">
@@ -412,7 +412,8 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
             </a>
           </div>
 
-        </TooltipBox>,
+        </TooltipBox>
+        </>,
         document.body
       )}
     </div>
