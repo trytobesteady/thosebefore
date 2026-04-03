@@ -14,6 +14,8 @@ export default function TimelineRow({
   onDragStart,
   onDragOver,
   isDragging,
+  onAdd,
+  existingIds,
 }) {
   const color = getColorForId(person.id);
 
@@ -57,6 +59,8 @@ export default function TimelineRow({
           startYear={startYear}
           totalYears={totalYears}
           pixelsPerYear={pixelsPerYear}
+          onAdd={onAdd}
+          existingIds={existingIds}
         />
       </div>
     </div>

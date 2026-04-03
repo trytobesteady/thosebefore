@@ -73,6 +73,8 @@ export default function App() {
           onReorder={reorder}
           onSortByBirth={sortByBirth}
           onSortByDeath={sortByDeath}
+          onAdd={addPerson}
+          existingIds={existingIds}
         />
       </main>
 

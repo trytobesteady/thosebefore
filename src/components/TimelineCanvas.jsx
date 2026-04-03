@@ -48,6 +48,8 @@ export default function TimelineCanvas({
   onReorder,
   onSortByBirth,
   onSortByDeath,
+  onAdd,
+  existingIds,
 }) {
   const scrollRef = useRef(null);
   const dragIndexRef = useRef(null);
@@ -138,6 +140,8 @@ export default function TimelineCanvas({
                   onDragStart={handleDragStart}
                   onDragOver={handleDragOver}
                   isDragging={dragOverIndex === index && dragIndexRef.current !== index}
+                  onAdd={onAdd}
+                  existingIds={existingIds}
                 />
               ))}
             </div>
