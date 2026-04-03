@@ -5,15 +5,30 @@ const USER_AGENT = "ThoseBefore/1.0 (github.com/thosebefore)";
 /**
  * Fetch with automatic retry on 429 (rate limit).
  */
-async function fetchWithRetry(url, options = {}, retries = 2) {
+async function abortableDelay(ms, signal) {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(resolve, ms);
+    signal?.addEventListener("abort", () => { clearTimeout(t); reject(new DOMException("Aborted", "AbortError")); }, { once: true });
+  });
+}
+
+async function fetchWithRetry(url, options = {}, retries = 3) {
+  const signal = options.signal;
   for (let attempt = 0; attempt <= retries; attempt++) {
-    const resp = await fetch(url, options);
-    if (resp.status === 429 && attempt < retries) {
-      const wait = (attempt + 1) * 1000;
-      await new Promise((r) => setTimeout(r, wait));
-      continue;
+    try {
+      const resp = await fetch(url, options);
+      if (resp.status === 429 && attempt < retries) {
+        const retryAfter = resp.headers.get("Retry-After");
+        const wait = retryAfter ? parseFloat(retryAfter) * 1000 : (attempt + 1) * 2000;
+        await abortableDelay(wait, signal);
+        continue;
+      }
+      return resp;
+    } catch (e) {
+      if (e.name === "AbortError") throw e;
+      if (attempt === retries) throw e;
+      await abortableDelay((attempt + 1) * 2000, signal);
     }
-    return resp;
   }
 }
 
@@ -140,63 +155,72 @@ export async function fetchEntityById(id) {
 }
 
 /**
- * Fetch contemporaries:
- * - diedAtBirth: top 3 notable people who died within [birthYear ± range]
- * - bornAtDeath: top 3 notable people who were born within [deathYear ± range]
- * Uses Wikipedia category API (fast) + wbgetentities for sitelink-based ranking.
+ * Format a year as an xsd:dateTime string for SPARQL filters.
+ * Handles BCE years (negative) correctly.
  */
-export async function fetchContemporaries(personId, birthYear, deathYear, range = 15) {
-  async function fetchTopForYears(yearCenter, type) {
-    // type: "deaths" | "births"
-    const years = [];
-    for (let y = yearCenter - range; y <= yearCenter + range; y++) years.push(y);
+function toSparqlDate(year, month = 1, day = 1) {
+  const sign = year < 0 ? "-" : "";
+  const abs = String(Math.abs(year)).padStart(4, "0");
+  const mm = String(month).padStart(2, "0");
+  const dd = String(day).padStart(2, "0");
+  return `"${sign}${abs}-${mm}-${dd}T00:00:00Z"^^xsd:dateTime`;
+}
 
-    // Fetch all year categories in parallel
-    const allTitles = new Set();
-    await Promise.all(years.map(async (year) => {
-      try {
-        const cat = `Category:${year}_${type}`;
-        const params = new URLSearchParams({
-          action: "query", list: "categorymembers",
-          cmtitle: cat, cmlimit: "50", cmtype: "page",
-          format: "json", origin: "*",
-        });
-        const resp = await fetch(`https://en.wikipedia.org/w/api.php?${params}`, {
-          headers: { "User-Agent": USER_AGENT },
-        });
-        const data = await resp.json();
-        (data.query?.categorymembers || []).forEach((m) => allTitles.add(m.title));
-      } catch { /* skip failed years */ }
-    }));
+/**
+ * Fetch top 5 notable contemporaries.
+ * mode "deaths": people who died within [centerYear ± range] (P570)
+ * mode "births": people who were born within [centerYear ± range] (P569)
+ *
+ * Two-step: SPARQL for IDs (fast, no sitelinks join) + wbgetentities for ranking.
+ */
+export async function fetchContemporaries(personId, centerYear, mode, range = 5, limit = 5) {
+  const property = mode === "births" ? "P569" : "P570";
+  const fromYear = centerYear - range;
+  const toYear = centerYear + range;
 
-    if (!allTitles.size) return [];
+  // Step 1: get candidate IDs via date-range SPARQL (no ORDER BY, no sitelinks join)
+  const query = `
+SELECT DISTINCT ?person WHERE {
+  ?person wdt:${property} ?date ;
+          wdt:P31 wd:Q5 .
+  FILTER(?date >= ${toSparqlDate(fromYear)} &&
+         ?date < ${toSparqlDate(toYear + 1)} &&
+         ?person != wd:${personId})
+}
+LIMIT 200
+`.trim();
+  const sparqlData = await runSparqlQuery(query);
+  const ids = sparqlData.results.bindings.map((b) => b.person.value.split("/").pop());
+  if (!ids.length) return [];
 
-    // Map Wikipedia titles → Wikidata entities + sitelink counts
-    const titles = [...allTitles].slice(0, 50).join("|");
+  // Step 2: fetch labels + sitelinks in batches of 50 (API limit), rank locally
+  const BATCH = 50;
+  const batches = [];
+  for (let i = 0; i < ids.length; i += BATCH) batches.push(ids.slice(i, i + BATCH));
+
+  const entities = (await Promise.all(batches.map(async (batch) => {
     const params = new URLSearchParams({
-      action: "wbgetentities", sites: "enwiki", titles,
-      props: "labels|sitelinks", languages: "en",
-      format: "json", origin: "*",
+      action: "wbgetentities",
+      ids: batch.join("|"),
+      props: "labels|sitelinks",
+      languages: "en",
+      format: "json",
+      origin: "*",
     });
     const resp = await fetch(`${SEARCH_API}?${params}`, { headers: { "User-Agent": USER_AGENT } });
     const data = await resp.json();
+    return Object.values(data.entities || {});
+  }))).flat();
 
-    return Object.values(data.entities || {})
-      .filter((e) => e.id && e.id !== personId && !e.missing)
-      .map((e) => ({
-        id: e.id,
-        name: e.labels?.en?.value || e.id,
-        sitelinks: e.sitelinks ? Object.keys(e.sitelinks).length : 0,
-      }))
-      .sort((a, b) => b.sitelinks - a.sitelinks)
-      .slice(0, 3);
-  }
-
-  const [diedAtBirth, bornAtDeath] = await Promise.all([
-    birthYear != null ? fetchTopForYears(birthYear, "deaths").catch(() => []) : Promise.resolve([]),
-    deathYear != null ? fetchTopForYears(deathYear, "births").catch(() => []) : Promise.resolve([]),
-  ]);
-  return { diedAtBirth, bornAtDeath };
+  return entities
+    .filter((e) => e.id && !e.missing)
+    .map((e) => ({
+      id: e.id,
+      name: e.labels?.en?.value || e.id,
+      sitelinks: e.sitelinks ? Object.keys(e.sitelinks).length : 0,
+    }))
+    .sort((a, b) => b.sitelinks - a.sitelinks)
+    .slice(0, limit);
 }
 
 /**
@@ -227,21 +251,21 @@ export async function fetchRelatedPersons(id) {
 SELECT DISTINCT ?rel ?relLabel ?relType WHERE {
   VALUES ?person { wd:${id} }
   {
-    ?person wdt:P26 ?rel . BIND("Ehepartner" AS ?relType)
+    ?person wdt:P26 ?rel . BIND("Spouse" AS ?relType)
   } UNION {
-    ?person wdt:P40 ?rel . BIND("Kind" AS ?relType)
+    ?person wdt:P40 ?rel . BIND("Child" AS ?relType)
   } UNION {
-    ?person wdt:P22 ?rel . BIND("Vater" AS ?relType)
+    ?person wdt:P22 ?rel . BIND("Father" AS ?relType)
   } UNION {
-    ?person wdt:P25 ?rel . BIND("Mutter" AS ?relType)
+    ?person wdt:P25 ?rel . BIND("Mother" AS ?relType)
   } UNION {
-    ?person wdt:P3373 ?rel . BIND("Geschwister" AS ?relType)
+    ?person wdt:P3373 ?rel . BIND("Sibling" AS ?relType)
   } UNION {
-    ?person wdt:P1066 ?rel . BIND("Schüler von" AS ?relType)
+    ?person wdt:P1066 ?rel . BIND("Student of" AS ?relType)
   } UNION {
-    ?person wdt:P802 ?rel . BIND("Schüler" AS ?relType)
+    ?person wdt:P802 ?rel . BIND("Student" AS ?relType)
   } UNION {
-    ?person wdt:P737 ?rel . BIND("Beeinflusst von" AS ?relType)
+    ?person wdt:P737 ?rel . BIND("Influenced by" AS ?relType)
   }
   SERVICE wikibase:label { bd:serviceParam wikibase:language "de,en" }
 }
@@ -256,12 +280,15 @@ LIMIT 12
 }
 
 export async function runSparqlQuery(query, signal) {
-  const url = `${SPARQL_ENDPOINT}?query=${encodeURIComponent(query)}&format=json`;
-  const resp = await fetchWithRetry(url, {
+  const body = new URLSearchParams({ query, format: "json" });
+  const resp = await fetchWithRetry(SPARQL_ENDPOINT, {
+    method: "POST",
     headers: {
       Accept: "application/sparql-results+json",
+      "Content-Type": "application/x-www-form-urlencoded",
       "User-Agent": USER_AGENT,
     },
+    body,
     signal,
   });
   if (!resp.ok) throw new Error(`SPARQL error: ${resp.status}`);

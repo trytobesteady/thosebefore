@@ -31,19 +31,19 @@ export default function TimelineRow({
         style={{ width: 160 }}
         draggable
         onDragStart={() => onDragStart(index)}
-        title="Ziehen zum Verschieben"
+        title="Drag to reorder"
       >
         <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color.bg }} />
         <div className="flex flex-col min-w-0 flex-1">
           <span className="text-xs font-medium truncate leading-tight">{person.name}</span>
-          <span className="text-[10px] text-base-content/40 leading-tight tabular-nums">
-            {person.birthYear ?? "?"} – {person.deathYear ?? "heute"}
+          <span className="text-xs text-base-content/40 leading-tight tabular-nums">
+            {person.birthYear ?? "?"} – {person.deathYear ?? "present"}
           </span>
         </div>
         <button
           className="btn btn-ghost btn-xs text-base-content/30 hover:text-error p-0 min-h-0 h-5 w-5"
           onClick={() => onRemove(person.id)}
-          title="Entfernen"
+          title="Remove"
         >
           ×
         </button>

@@ -42,21 +42,21 @@ export default function App() {
             className={`btn btn-sm ${copied ? "btn-success" : "btn-outline"}`}
             onClick={handleShare}
             disabled={persons.length === 0}
-            title="URL in Zwischenablage kopieren"
+            title="Copy URL to clipboard"
           >
             {copied ? (
               <>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                Kopiert!
+                Copied!
               </>
             ) : (
               <>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                 </svg>
-                Teilen
+                Share
               </>
             )}
           </button>
@@ -74,9 +74,9 @@ export default function App() {
         <div className="fixed inset-0 z-[10000] bg-base-100/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
           <span className="loading loading-spinner loading-lg text-primary" />
           <div className="text-center">
-            <div className="font-medium text-base-content">Zeitleiste wird geladen…</div>
+            <div className="font-medium text-base-content">Loading timeline…</div>
             <div className="text-sm text-base-content/50 mt-1">
-              {loadingState.loaded} von {loadingState.total} Person{loadingState.total !== 1 ? "en" : ""}
+              {loadingState.loaded} of {loadingState.total} person{loadingState.total !== 1 ? "s" : ""}
             </div>
           </div>
           <div className="w-48 bg-base-300 rounded-full h-1.5 overflow-hidden">
@@ -104,8 +104,8 @@ export default function App() {
 
       {persons.length > 0 && (
         <footer className="border-t border-base-200 px-4 py-1.5 text-xs text-base-content/30 flex gap-4 shrink-0">
-          <span>{persons.length} Person{persons.length !== 1 ? "en" : ""}</span>
-          <span>Daten: Wikidata (CC0)</span>
+          <span>{persons.length} person{persons.length !== 1 ? "s" : ""}</span>
+          <span>Data: Wikidata (CC0)</span>
         </footer>
       )}
     </div>

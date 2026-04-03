@@ -3,18 +3,23 @@ import { createPortal } from "react-dom";
 import { getColorForId } from "../utils/colors";
 import { fetchRelatedPersons, fetchContemporaries, fetchEntityById, fetchPersonImage } from "../utils/sparql";
 
+// Session-level caches — survive tooltip close/reopen and component remounts
+const _imageCache = new Map();
+const _relatedCache = new Map();
+const _contempCache = new Map();
+
 function formatDate(date) {
   if (!date) return "?";
   const year = date.getFullYear();
   const month = date.getMonth() + 1;
   const day = date.getDate();
   if (month === 1 && day === 1) {
-    return year < 0 ? `${Math.abs(year)} v. Chr.` : String(year);
+    return year < 0 ? `${Math.abs(year)} BC` : String(year);
   }
   const d = String(day).padStart(2, "0");
   const m = String(month).padStart(2, "0");
   return year < 0
-    ? `${d}.${m}.${Math.abs(year)} v. Chr.`
+    ? `${d}.${m}.${Math.abs(year)} BC`
     : `${d}.${m}.${year}`;
 }
 
@@ -28,15 +33,25 @@ function groupBy(arr, key) {
 const TOOLTIP_WIDTH = 300;
 const MARGIN = 8;
 
-function CollapsibleSection({ title, loading, defaultOpen = false, children, right }) {
+function CollapsibleSection({ title, loading, defaultOpen = false, children, right, onFirstOpen }) {
   const [open, setOpen] = useState(defaultOpen);
+  const firedRef = useRef(false);
+  function toggle(e) {
+    e.stopPropagation();
+    const next = !open;
+    setOpen(next);
+    if (next && !firedRef.current) {
+      firedRef.current = true;
+      onFirstOpen?.();
+    }
+  }
   return (
     <div className="border-t border-base-200 mt-2">
       <button
         className="flex items-center justify-between w-full pt-2 pb-1 text-left gap-1"
-        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        onClick={toggle}
       >
-        <span className="text-[10px] uppercase tracking-wide text-base-content/40 font-medium flex items-center gap-1">
+        <span className="text-xs uppercase tracking-wide text-base-content/40 font-medium flex items-center gap-1">
           {title}
           {loading && <span className="loading loading-spinner loading-xs ml-1" />}
         </span>
@@ -98,7 +113,7 @@ function TooltipBox({ pos, onMouseEnter, onMouseLeave, onClose, children }) {
       <button
         className="absolute top-2 right-2 text-base-content/30 hover:text-base-content/70 transition-colors leading-none"
         onClick={(e) => { e.stopPropagation(); onClose(); }}
-        aria-label="Schließen"
+        aria-label="Close"
       >
         <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -122,7 +137,7 @@ function PersonChip({ person, onAdd, existingIds, addingId }) {
         }`}
       onClick={(e) => { e.stopPropagation(); if (!already && !addingId) onAdd(person); }}
       disabled={already || !!addingId}
-      title={already ? "Bereits auf der Zeitleiste" : "Zur Zeitleiste hinzufügen"}
+      title={already ? "Already on timeline" : "Add to timeline"}
     >
       {loading && <span className="loading loading-spinner loading-xs" />}
       {person.name}
@@ -136,19 +151,19 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
   const [tooltipPos, setTooltipPos] = useState(null);
 
   // Person image
-  const [image, setImage] = useState(undefined); // undefined = not loaded, null = no image
-  const imageFetchedRef = useRef(null);
+  const [image, setImage] = useState(() => _imageCache.has(person.id) ? _imageCache.get(person.id) : undefined);
+  const imageFetchedRef = useRef(_imageCache.has(person.id) ? person.id : null);
 
   // Related persons (family/influence)
-  const [related, setRelated] = useState(null);
+  const [related, setRelated] = useState(() => _relatedCache.get(person.id) ?? null);
   const [relatedLoading, setRelatedLoading] = useState(false);
-  const relatedFetchedRef = useRef(null);
 
   // Contemporaries
-  const [contemporaries, setContemporaries] = useState(null);
-  const [contemporariesLoading, setContemporariesLoading] = useState(false);
-  const [range, setRange] = useState(15);
-  const contemporariesFetchedRef = useRef(null); // tracks "id:range" key
+  const [contempResults, setContempResults] = useState(null);
+  const [contempLoading, setContempLoading] = useState(false);
+  const [contempMode, setContempMode] = useState(person.birthYear != null ? "deaths" : "births");
+  const [range, setRange] = useState(5);
+  const [contempLimit, setContempLimit] = useState(5);
 
   const [addingId, setAddingId] = useState(null);
   const blockRef = useRef(null);
@@ -177,36 +192,39 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
     if (rect) setTooltipPos({ blockTop: rect.top, blockBottom: rect.bottom, blockMidX: rect.left + rect.width / 2 });
   }
 
-  // Fetch image (once per person)
+  // Fetch image on first tooltip open (cached across hovers)
   useEffect(() => {
     if (!tooltipPos) return;
     if (imageFetchedRef.current === person.id) return;
     imageFetchedRef.current = person.id;
-    fetchPersonImage(person.name).then(setImage).catch(() => setImage(null));
+    fetchPersonImage(person.name).then((url) => {
+      _imageCache.set(person.id, url ?? null);
+      setImage(url ?? null);
+    }).catch(() => { _imageCache.set(person.id, null); setImage(null); });
   }, [tooltipPos, person.id, person.name]);
 
-  // Fetch related persons (once per person)
-  useEffect(() => {
-    if (!tooltipPos) return;
-    if (relatedFetchedRef.current === person.id) return;
-    relatedFetchedRef.current = person.id;
+  // Lazy-loaded on first section open
+  function loadRelated() {
+    if (_relatedCache.has(person.id)) { setRelated(_relatedCache.get(person.id)); return; }
     setRelatedLoading(true);
     fetchRelatedPersons(person.id)
-      .then(setRelated).catch(() => setRelated([]))
+      .then((d) => { _relatedCache.set(person.id, d); setRelated(d); })
+      .catch(() => setRelated([]))
       .finally(() => setRelatedLoading(false));
-  }, [tooltipPos, person.id]);
+  }
 
-  // Fetch contemporaries (re-fetches when range changes)
-  useEffect(() => {
-    if (!tooltipPos) return;
-    const key = `${person.id}:${range}`;
-    if (contemporariesFetchedRef.current === key) return;
-    contemporariesFetchedRef.current = key;
-    setContemporariesLoading(true);
-    fetchContemporaries(person.id, person.birthYear, person.deathYear, range)
-      .then(setContemporaries).catch(() => setContemporaries({ diedAtBirth: [], bornAtDeath: [] }))
-      .finally(() => setContemporariesLoading(false));
-  }, [tooltipPos, person.id, person.birthYear, person.deathYear, range]);
+  function searchContemporaries() {
+    const centerYear = contempMode === "deaths" ? person.birthYear : person.deathYear;
+    if (centerYear == null) return;
+    const key = `${person.id}:${contempMode}:${range}:${contempLimit}`;
+    if (_contempCache.has(key)) { setContempResults(_contempCache.get(key)); return; }
+    setContempLoading(true);
+    setContempResults(null);
+    fetchContemporaries(person.id, centerYear, contempMode, range, contempLimit)
+      .then((d) => { _contempCache.set(key, d); setContempResults(d); })
+      .catch(() => setContempResults([]))
+      .finally(() => setContempLoading(false));
+  }
 
   async function handleAdd(relPerson) {
     if (addingId || existingIds?.has(relPerson.id)) return;
@@ -275,17 +293,17 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
             <div>
               {person.deathDate != null
                 ? <>† {formatDate(person.deathDate)}</>
-                : <span className="text-success">lebt noch</span>}
+                : <span className="text-success">still alive</span>}
             </div>
           </div>
 
           {/* Related persons */}
-          <CollapsibleSection title="Verwandte &amp; Einflüsse" loading={relatedLoading} defaultOpen={true}>
+          <CollapsibleSection title="Relations &amp; Influences" loading={relatedLoading} defaultOpen={false} onFirstOpen={loadRelated}>
             {groupedRelated && Object.keys(groupedRelated).length > 0 ? (
               <div className="space-y-1.5">
                 {Object.entries(groupedRelated).map(([type, persons]) => (
                   <div key={type}>
-                    <span className="text-[10px] text-base-content/40">{type}</span>
+                    <span className="text-xs text-base-content/40">{type}</span>
                     <div className="flex flex-wrap gap-1 mt-0.5">
                       {persons.map((r) => (
                         <PersonChip key={r.id} person={r} onAdd={handleAdd} existingIds={existingIds} addingId={addingId} />
@@ -295,58 +313,91 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
                 ))}
               </div>
             ) : !relatedLoading ? (
-              <span className="text-xs text-base-content/30">Keine Einträge in Wikidata</span>
+              <span className="text-xs text-base-content/30">No entries in Wikidata</span>
             ) : null}
           </CollapsibleSection>
 
           {/* Contemporaries */}
-          <CollapsibleSection
-            title="Zeitgenossen"
-            loading={contemporariesLoading}
-            defaultOpen={true}
-            right={
-              <label className="flex items-center gap-1 text-[10px] text-base-content/40" onClick={(e) => e.stopPropagation()}>
-                ±
-                <input
-                  type="number"
-                  className="input input-xs input-ghost w-10 text-center px-0.5 h-5 min-h-0"
-                  value={range}
-                  min={1} max={25}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => setRange(Math.max(1, Math.min(25, parseInt(e.target.value) || 15)))}
-                />
-                J.
-              </label>
-            }
-          >
-            {contemporaries && !contemporariesLoading && (
-              <div className="space-y-1.5">
-                {person.birthYear != null && (
-                  <div>
-                    <span className="text-[10px] text-base-content/40">† um {person.birthYear} — wer verließ die Bühne</span>
-                    <div className="flex flex-wrap gap-1 mt-0.5">
-                      {contemporaries.diedAtBirth.length > 0
-                        ? contemporaries.diedAtBirth.map((r) => (
-                            <PersonChip key={r.id} person={r} onAdd={handleAdd} existingIds={existingIds} addingId={addingId} />
-                          ))
-                        : <span className="text-xs text-base-content/30">–</span>}
-                    </div>
-                  </div>
-                )}
-                {person.deathYear != null && (
-                  <div>
-                    <span className="text-[10px] text-base-content/40">* um {person.deathYear} — wer betrat die Bühne</span>
-                    <div className="flex flex-wrap gap-1 mt-0.5">
-                      {contemporaries.bornAtDeath.length > 0
-                        ? contemporaries.bornAtDeath.map((r) => (
-                            <PersonChip key={r.id} person={r} onAdd={handleAdd} existingIds={existingIds} addingId={addingId} />
-                          ))
-                        : <span className="text-xs text-base-content/30">–</span>}
-                    </div>
-                  </div>
-                )}
+          <CollapsibleSection title="Contemporaries" loading={contempLoading} defaultOpen={false}>
+            <div className="space-y-2 pt-0.5" onClick={(e) => e.stopPropagation()}>
+              {/* Controls */}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1 cursor-pointer">
+                    <input
+                      type="radio" name={`cm-${person.id}`}
+                      className="radio radio-xs"
+                      checked={contempMode === "deaths"}
+                      disabled={person.birthYear == null}
+                      onChange={() => setContempMode("deaths")}
+                    />
+                    <span className={`text-xs ${person.birthYear == null ? "text-base-content/30" : "text-base-content/60"}`}>
+                      Birth{person.birthYear != null ? ` (${person.birthYear})` : ""}
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-1 cursor-pointer">
+                    <input
+                      type="radio" name={`cm-${person.id}`}
+                      className="radio radio-xs"
+                      checked={contempMode === "births"}
+                      disabled={person.deathYear == null}
+                      onChange={() => setContempMode("births")}
+                    />
+                    <span className={`text-xs ${person.deathYear == null ? "text-base-content/30" : "text-base-content/60"}`}>
+                      Death{person.deathYear != null ? ` (${person.deathYear})` : ""}
+                    </span>
+                  </label>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-base-content/40">±</span>
+                  <input
+                    type="number"
+                    className="input input-xs input-ghost w-10 text-center px-0.5 h-5 min-h-0"
+                    value={range} min={1} max={50}
+                    onChange={(e) => setRange(Math.max(1, Math.min(50, parseInt(e.target.value) || 5)))}
+                  />
+                  <span className="text-xs text-base-content/40">Years</span>
+                  <span className="text-xs text-base-content/20 mx-0.5">·</span>
+                  <span className="text-xs text-base-content/40">Top</span>
+                  <input
+                    type="number"
+                    className="input input-xs input-ghost w-8 text-center px-0.5 h-5 min-h-0"
+                    value={contempLimit} min={1} max={10}
+                    onChange={(e) => setContempLimit(Math.max(1, Math.min(10, parseInt(e.target.value) || 5)))}
+                  />
+                  <button
+                    className="btn btn-xs btn-ghost h-5 min-h-0 px-2 text-xs"
+                    onClick={searchContemporaries}
+                    disabled={contempLoading || (contempMode === "deaths" ? person.birthYear == null : person.deathYear == null)}
+                  >
+                    {contempLoading ? <span className="loading loading-spinner loading-xs" /> : "Search"}
+                  </button>
+                </div>
               </div>
-            )}
+              {/* Dynamic year range label */}
+              {(() => {
+                const centerYear = contempMode === "deaths" ? person.birthYear : person.deathYear;
+                if (centerYear == null) return null;
+                const from = centerYear - range;
+                const to = centerYear + range;
+                const verb = contempMode === "deaths" ? "People who died" : "People born";
+                return (
+                  <p className="text-xs text-base-content/40 italic">
+                    {verb} between {from} – {to}
+                  </p>
+                );
+              })()}
+              {/* Results */}
+              {contempResults != null && !contempLoading && (
+                <div className="flex flex-wrap gap-1">
+                  {contempResults.length > 0
+                    ? contempResults.map((r) => (
+                        <PersonChip key={r.id} person={r} onAdd={handleAdd} existingIds={existingIds} addingId={addingId} />
+                      ))
+                    : <span className="text-xs text-base-content/30">No results</span>}
+                </div>
+              )}
+            </div>
           </CollapsibleSection>
 
           {/* Links */}

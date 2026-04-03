@@ -85,25 +85,25 @@ export default function TimelineCanvas({
     <div className="flex flex-col flex-1 min-h-0">
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-base-200 bg-base-100 flex-wrap">
-        <span className="text-xs text-base-content/50 font-medium uppercase tracking-wide mr-1">Sortieren:</span>
+        <span className="text-xs text-base-content/50 font-medium uppercase tracking-wide mr-1">Sort:</span>
         <div className="join">
           <button
             className={`join-item btn btn-xs ${sortMode === "birth" ? "btn-primary" : "btn-ghost border border-base-300"}`}
             onClick={onSortByBirth}
           >
-            Nach Geburt
+            By birth
           </button>
           <button
             className={`join-item btn btn-xs ${sortMode === "death" ? "btn-primary" : "btn-ghost border border-base-300"}`}
             onClick={onSortByDeath}
           >
-            Nach Tod
+            By death
           </button>
           <button
             className={`join-item btn btn-xs ${sortMode === "manual" ? "btn-primary" : "btn-ghost border border-base-300"}`}
             disabled
           >
-            Manuell
+            Manual
           </button>
         </div>
 
@@ -121,7 +121,7 @@ export default function TimelineCanvas({
           <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
-          <span>Suche Personen und füge sie der Zeitleiste hinzu</span>
+          <span>Search for people and add them to the timeline</span>
         </div>
       ) : (
         <div ref={scrollRef} className="flex-1 overflow-auto">
