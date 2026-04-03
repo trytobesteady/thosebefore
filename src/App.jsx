@@ -5,7 +5,7 @@ import { useTimeline } from "./hooks/useTimeline";
 import { encodeState } from "./utils/urlState";
 
 export default function App() {
-  const { persons, sortMode, addPerson, removePerson, reorder, sortByBirth, sortByDeath } = useTimeline();
+  const { persons, sortMode, loadingState, addPerson, removePerson, reorder, sortByBirth, sortByDeath } = useTimeline();
   const [copied, setCopied] = useState(false);
 
   const existingIds = useMemo(() => new Set(persons.map((p) => p.id)), [persons]);
@@ -63,6 +63,25 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      {/* Initial URL loading overlay */}
+      {loadingState && (
+        <div className="fixed inset-0 z-[10000] bg-base-100/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
+          <span className="loading loading-spinner loading-lg text-primary" />
+          <div className="text-center">
+            <div className="font-medium text-base-content">Zeitleiste wird geladen…</div>
+            <div className="text-sm text-base-content/50 mt-1">
+              {loadingState.loaded} von {loadingState.total} Person{loadingState.total !== 1 ? "en" : ""}
+            </div>
+          </div>
+          <div className="w-48 bg-base-300 rounded-full h-1.5 overflow-hidden">
+            <div
+              className="h-full bg-primary rounded-full transition-all duration-300"
+              style={{ width: `${(loadingState.loaded / loadingState.total) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Timeline */}
       <main className="flex-1 min-h-0 flex flex-col">

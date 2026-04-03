@@ -1,4 +1,4 @@
-import { useReducer, useEffect } from "react";
+import { useReducer, useEffect, useState } from "react";
 import { decodeState } from "../utils/urlState";
 import { fetchEntityById } from "../utils/sparql";
 
@@ -43,6 +43,10 @@ function reducer(state, action) {
 
 export function useTimeline() {
   const [state, dispatch] = useReducer(reducer, { persons: [], sortMode: "manual" });
+  const [loadingState, setLoadingState] = useState(() => {
+    const ids = decodeState(window.location.search);
+    return ids.length > 0 ? { active: true, total: ids.length, loaded: 0 } : null;
+  });
 
   // Load persons from URL on mount
   useEffect(() => {
@@ -58,8 +62,10 @@ export function useTimeline() {
         } catch {
           // skip failed lookups
         }
+        setLoadingState((prev) => prev ? { ...prev, loaded: prev.loaded + 1 } : null);
       }
       if (persons.length > 0) dispatch({ type: "SET_PERSONS", persons });
+      setLoadingState(null);
     })();
   }, []);
 
@@ -72,6 +78,7 @@ export function useTimeline() {
   return {
     persons: state.persons,
     sortMode: state.sortMode,
+    loadingState,
     addPerson,
     removePerson,
     reorder,
