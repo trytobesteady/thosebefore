@@ -73,18 +73,7 @@ export default function App() {
       {loadingState && (
         <div className="fixed inset-0 z-[10000] bg-base-100/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
           <span className="loading loading-spinner loading-lg text-primary" />
-          <div className="text-center">
-            <div className="font-medium text-base-content">Loading timeline…</div>
-            <div className="text-sm text-base-content/50 mt-1">
-              {loadingState.loaded} of {loadingState.total} person{loadingState.total !== 1 ? "s" : ""}
-            </div>
-          </div>
-          <div className="w-48 bg-base-300 rounded-full h-1.5 overflow-hidden">
-            <div
-              className="h-full bg-primary rounded-full transition-all duration-300"
-              style={{ width: `${(loadingState.loaded / loadingState.total) * 100}%` }}
-            />
-          </div>
+          <div className="font-medium text-base-content">Loading timeline…</div>
         </div>
       )}
 

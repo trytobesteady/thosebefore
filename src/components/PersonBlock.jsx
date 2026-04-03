@@ -192,16 +192,15 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
     }
   }
 
-  // Fetch image on first tooltip open (cached across hovers)
+  // Fetch image on mount (cached across remounts)
   useEffect(() => {
-    if (!tooltipPos) return;
     if (imageFetchedRef.current === person.id) return;
     imageFetchedRef.current = person.id;
     fetchPersonImage(person.name).then((url) => {
       _imageCache.set(person.id, url ?? null);
       setImage(url ?? null);
     }).catch(() => { _imageCache.set(person.id, null); setImage(null); });
-  }, [tooltipPos, person.id, person.name]);
+  }, [person.id, person.name]);
 
   // Lazy-loaded on first section open
   function loadRelated() {
@@ -251,7 +250,7 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
             <img
               src={image}
               alt={person.name}
-              className="rounded-full shrink-0 object-cover"
+              className="rounded-full shrink-0 object-cover object-top"
               style={{ width: 24, height: 24, boxShadow: "0 0 0 1.5px rgba(255,255,255,0.5)" }}
             />
           )}
@@ -277,7 +276,7 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
               <img
                 src={image}
                 alt={person.name}
-                className="rounded-full shrink-0 object-cover"
+                className="rounded-full shrink-0 object-cover object-top"
                 style={{ width: 40, height: 40, boxShadow: "0 0 0 2px rgba(0,0,0,0.08)" }}
               />
             )}

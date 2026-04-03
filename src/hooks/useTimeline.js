@@ -1,6 +1,6 @@
 import { useReducer, useEffect, useState } from "react";
 import { decodeState } from "../utils/urlState";
-import { fetchEntityById } from "../utils/sparql";
+import { fetchEntitiesByIds } from "../utils/sparql";
 
 function reducer(state, action) {
   switch (action.type) {
@@ -45,7 +45,7 @@ export function useTimeline() {
   const [state, dispatch] = useReducer(reducer, { persons: [], sortMode: "manual" });
   const [loadingState, setLoadingState] = useState(() => {
     const ids = decodeState(window.location.search);
-    return ids.length > 0 ? { active: true, total: ids.length, loaded: 0 } : null;
+    return ids.length > 0 ? true : null;
   });
 
   // Load persons from URL on mount
@@ -54,23 +54,17 @@ export function useTimeline() {
     if (!ids.length) return;
 
     let cancelled = false;
-    setLoadingState({ active: true, total: ids.length, loaded: 0 });
+    setLoadingState(true);
 
     (async () => {
-      const persons = [];
-      for (const id of ids) {
+      try {
+        const persons = await fetchEntitiesByIds(ids);
         if (cancelled) return;
-        try {
-          const person = await fetchEntityById(id);
-          if (person) persons.push(person);
-        } catch {
-          // skip failed lookups
-        }
-        if (!cancelled) setLoadingState((prev) => prev ? { ...prev, loaded: prev.loaded + 1 } : null);
+        if (persons.length > 0) dispatch({ type: "SET_PERSONS", persons });
+      } catch {
+        // skip failed lookups
       }
-      if (cancelled) return;
-      if (persons.length > 0) dispatch({ type: "SET_PERSONS", persons });
-      setLoadingState(null);
+      if (!cancelled) setLoadingState(null);
     })();
 
     return () => { cancelled = true; };

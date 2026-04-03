@@ -128,30 +128,51 @@ export async function searchPersons(searchTerm, filters = {}, signal) {
 }
 
 /**
+ * Lookup multiple entities by Wikidata ID in batch (used for URL state restore).
+ * Returns persons in the same order as the input ids array.
+ */
+export async function fetchEntitiesByIds(ids) {
+  if (!ids.length) return [];
+
+  // 1 SPARQL call for all IDs
+  const detailsMap = await fetchPersonDetails(ids);
+
+  // 1 wbgetentities call for all IDs (max 50 per request — batch if needed)
+  const BATCH = 50;
+  const labelsMap = {};
+  for (let i = 0; i < ids.length; i += BATCH) {
+    const batch = ids.slice(i, i + BATCH);
+    const params = new URLSearchParams({
+      action: "wbgetentities",
+      ids: batch.join("|"),
+      props: "labels|descriptions",
+      languages: "en",
+      format: "json",
+      origin: "*",
+    });
+    const resp = await fetchWithRetry(`${SEARCH_API}?${params}`, {
+      headers: { "User-Agent": USER_AGENT },
+    });
+    const data = await resp.json();
+    for (const [id, entity] of Object.entries(data.entities || {})) {
+      labelsMap[id] = {
+        name: entity.labels?.en?.value || id,
+        description: entity.descriptions?.en?.value || "",
+      };
+    }
+  }
+
+  return ids
+    .filter((id) => detailsMap[id])
+    .map((id) => ({ id, ...labelsMap[id], ...detailsMap[id] }));
+}
+
+/**
  * Lookup a single entity by Wikidata ID (used for URL state restore).
  */
 export async function fetchEntityById(id) {
-  const detailsMap = await fetchPersonDetails([id]);
-  if (!detailsMap[id]) return null;
-
-  // Get label/description via search API
-  const params = new URLSearchParams({
-    action: "wbgetentities",
-    ids: id,
-    props: "labels|descriptions",
-    languages: "en",
-    format: "json",
-    origin: "*",
-  });
-  const resp = await fetch(`${SEARCH_API}?${params}`, {
-    headers: { "User-Agent": USER_AGENT },
-  });
-  const data = await resp.json();
-  const entity = data.entities?.[id];
-  const name = entity?.labels?.en?.value || id;
-  const description = entity?.descriptions?.en?.value || "";
-
-  return { id, name, description, ...detailsMap[id] };
+  const persons = await fetchEntitiesByIds([id]);
+  return persons[0] ?? null;
 }
 
 /**
