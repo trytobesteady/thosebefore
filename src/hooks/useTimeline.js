@@ -53,20 +53,27 @@ export function useTimeline() {
     const ids = decodeState(window.location.search);
     if (!ids.length) return;
 
+    let cancelled = false;
+    setLoadingState({ active: true, total: ids.length, loaded: 0 });
+
     (async () => {
       const persons = [];
       for (const id of ids) {
+        if (cancelled) return;
         try {
           const person = await fetchEntityById(id);
           if (person) persons.push(person);
         } catch {
           // skip failed lookups
         }
-        setLoadingState((prev) => prev ? { ...prev, loaded: prev.loaded + 1 } : null);
+        if (!cancelled) setLoadingState((prev) => prev ? { ...prev, loaded: prev.loaded + 1 } : null);
       }
+      if (cancelled) return;
       if (persons.length > 0) dispatch({ type: "SET_PERSONS", persons });
       setLoadingState(null);
     })();
+
+    return () => { cancelled = true; };
   }, []);
 
   const addPerson = (person) => dispatch({ type: "ADD_PERSON", person });
