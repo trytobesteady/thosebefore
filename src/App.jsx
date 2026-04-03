@@ -30,8 +30,7 @@ export default function App() {
         {/* Row 1: title left, share right */}
         <div className="flex items-center justify-between px-4 pt-2.5 pb-1">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-lg tracking-tight text-base-content">Those Before</span>
-            <span className="badge badge-ghost badge-sm text-base-content/40">Zeitleiste</span>
+            <span className="font-bold text-lg tracking-tight text-base-content">Biographical Timeline</span>
           </div>
           <button
             className={`btn btn-sm ${copied ? "btn-success" : "btn-outline"}`}
