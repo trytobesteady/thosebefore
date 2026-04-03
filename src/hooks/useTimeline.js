@@ -19,20 +19,22 @@ function reducer(state, action) {
       return { ...state, persons, sortMode: "manual" };
     }
     case "SORT_BY_BIRTH": {
+      const dir = action.dir ?? "asc";
       const sorted = [...state.persons].sort((a, b) => {
-        const ay = a.birthYear ?? Infinity;  // unknown → end
+        const ay = a.birthYear ?? Infinity;
         const by = b.birthYear ?? Infinity;
-        return ay - by;
+        return dir === "asc" ? ay - by : by - ay;
       });
-      return { ...state, persons: sorted, sortMode: "birth" };
+      return { ...state, persons: sorted, sortMode: "birth", sortDir: dir };
     }
     case "SORT_BY_DEATH": {
+      const dir = action.dir ?? "asc";
       const sorted = [...state.persons].sort((a, b) => {
-        const ay = a.deathYear ?? Infinity;  // still living → end
+        const ay = a.deathYear ?? Infinity;
         const by = b.deathYear ?? Infinity;
-        return ay - by;
+        return dir === "asc" ? ay - by : by - ay;
       });
-      return { ...state, persons: sorted, sortMode: "death" };
+      return { ...state, persons: sorted, sortMode: "death", sortDir: dir };
     }
     case "SET_SORT_MODE":
       return { ...state, sortMode: action.mode };
@@ -42,7 +44,7 @@ function reducer(state, action) {
 }
 
 export function useTimeline() {
-  const [state, dispatch] = useReducer(reducer, { persons: [], sortMode: "manual" });
+  const [state, dispatch] = useReducer(reducer, { persons: [], sortMode: "manual", sortDir: "asc" });
   const [loadingState, setLoadingState] = useState(() => {
     const ids = decodeState(window.location.search);
     return ids.length > 0 ? true : null;
@@ -73,17 +75,24 @@ export function useTimeline() {
   const addPerson = (person) => dispatch({ type: "ADD_PERSON", person });
   const removePerson = (id) => dispatch({ type: "REMOVE_PERSON", id });
   const reorder = (from, to) => dispatch({ type: "REORDER", from, to });
-  const sortByBirth = () => dispatch({ type: "SORT_BY_BIRTH" });
-  const sortByDeath = () => dispatch({ type: "SORT_BY_DEATH" });
+  const sortByBirth = (dir) => dispatch({ type: "SORT_BY_BIRTH", dir: dir ?? "asc" });
+  const sortByDeath = (dir) => dispatch({ type: "SORT_BY_DEATH", dir: dir ?? "asc" });
+  const toggleSortDir = () => {
+    const newDir = state.sortDir === "asc" ? "desc" : "asc";
+    if (state.sortMode === "birth") dispatch({ type: "SORT_BY_BIRTH", dir: newDir });
+    if (state.sortMode === "death") dispatch({ type: "SORT_BY_DEATH", dir: newDir });
+  };
 
   return {
     persons: state.persons,
     sortMode: state.sortMode,
+    sortDir: state.sortDir,
     loadingState,
     addPerson,
     removePerson,
     reorder,
     sortByBirth,
     sortByDeath,
+    toggleSortDir,
   };
 }

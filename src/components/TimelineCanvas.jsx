@@ -44,10 +44,12 @@ function generateTicks(startYear, endYear, interval) {
 export default function TimelineCanvas({
   persons,
   sortMode,
+  sortDir,
   onRemove,
   onReorder,
   onSortByBirth,
   onSortByDeath,
+  onToggleSortDir,
   onAdd,
   existingIds,
 }) {
@@ -89,13 +91,13 @@ export default function TimelineCanvas({
         <div className="join">
           <button
             className={`join-item btn btn-xs ${sortMode === "birth" ? "btn-primary" : "btn-ghost border border-base-300"}`}
-            onClick={onSortByBirth}
+            onClick={() => onSortByBirth(sortMode === "birth" ? sortDir : "asc")}
           >
             By birth
           </button>
           <button
             className={`join-item btn btn-xs ${sortMode === "death" ? "btn-primary" : "btn-ghost border border-base-300"}`}
-            onClick={onSortByDeath}
+            onClick={() => onSortByDeath(sortMode === "death" ? sortDir : "asc")}
           >
             By death
           </button>
@@ -106,6 +108,15 @@ export default function TimelineCanvas({
             Manual
           </button>
         </div>
+        {(sortMode === "birth" || sortMode === "death") && (
+          <button
+            className="btn btn-xs btn-ghost border border-base-300"
+            onClick={onToggleSortDir}
+            title={sortDir === "asc" ? "Ascending — click to reverse" : "Descending — click to reverse"}
+          >
+            {sortDir === "asc" ? "↑" : "↓"}
+          </button>
+        )}
 
         <div className="ml-auto flex items-center gap-2">
           <span className="text-xs text-base-content/50">Zoom:</span>

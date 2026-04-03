@@ -199,11 +199,12 @@ export async function fetchContemporaries(personId, centerYear, mode, range = 5,
   const fromYear = centerYear - range;
   const toYear = centerYear + range;
 
-  // Step 1: get candidate IDs via date-range SPARQL (no ORDER BY, no sitelinks join)
+  // Step 1: get candidate IDs + sitelinks count via SPARQL (no ORDER BY — sort locally)
   const query = `
-SELECT DISTINCT ?person WHERE {
+SELECT ?person ?sitelinks WHERE {
   ?person wdt:${property} ?date ;
           wdt:P31 wd:Q5 .
+  OPTIONAL { ?person wikibase:sitelinks ?sitelinks }
   FILTER(?date >= ${toSparqlDate(fromYear)} &&
          ?date < ${toSparqlDate(toYear + 1)} &&
          ?person != wd:${personId})
@@ -211,38 +212,40 @@ SELECT DISTINCT ?person WHERE {
 LIMIT 200
 `.trim();
   const sparqlData = await runSparqlQuery(query);
-  const ids = sparqlData.results.bindings.map((b) => b.person.value.split("/").pop());
-  if (!ids.length) return [];
+  if (!sparqlData.results.bindings.length) return [];
 
-  // Step 2: fetch labels + sitelinks in batches of 50 (API limit), rank locally
-  const BATCH = 50;
-  const batches = [];
-  for (let i = 0; i < ids.length; i += BATCH) batches.push(ids.slice(i, i + BATCH));
-
-  const entities = (await Promise.all(batches.map(async (batch) => {
-    const params = new URLSearchParams({
-      action: "wbgetentities",
-      ids: batch.join("|"),
-      props: "labels|descriptions|sitelinks",
-      languages: "en",
-      format: "json",
-      origin: "*",
-    });
-    const resp = await fetch(`${SEARCH_API}?${params}`, { headers: { "User-Agent": USER_AGENT } });
-    const data = await resp.json();
-    return Object.values(data.entities || {});
-  }))).flat();
-
-  return entities
-    .filter((e) => e.id && !e.missing)
-    .map((e) => ({
-      id: e.id,
-      name: e.labels?.en?.value || e.id,
-      description: e.descriptions?.en?.value || "",
-      sitelinks: e.sitelinks ? Object.keys(e.sitelinks).length : 0,
-    }))
+  // Sort all candidates locally by sitelinks DESC, take top N
+  const topIds = sparqlData.results.bindings
+    .map((b) => ({ id: b.person.value.split("/").pop(), sitelinks: b.sitelinks ? parseInt(b.sitelinks.value) : 0 }))
     .sort((a, b) => b.sitelinks - a.sitelinks)
-    .slice(0, limit);
+    .slice(0, limit)
+    .map((e) => e.id);
+
+  if (!topIds.length) return [];
+
+  // Step 2: fetch labels + descriptions only for top N (small response)
+  const params = new URLSearchParams({
+    action: "wbgetentities",
+    ids: topIds.join("|"),
+    props: "labels|descriptions",
+    languages: "en",
+    format: "json",
+    origin: "*",
+  });
+  const resp = await fetchWithRetry(`${SEARCH_API}?${params}`, { headers: { "User-Agent": USER_AGENT } });
+  const data = await resp.json();
+
+  return topIds
+    .map((id) => {
+      const e = data.entities?.[id];
+      if (!e || e.missing) return null;
+      return {
+        id,
+        name: e.labels?.en?.value || id,
+        description: e.descriptions?.en?.value || "",
+      };
+    })
+    .filter(Boolean);
 }
 
 /**

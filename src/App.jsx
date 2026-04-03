@@ -5,7 +5,7 @@ import { useTimeline } from "./hooks/useTimeline";
 import { encodeState } from "./utils/urlState";
 
 export default function App() {
-  const { persons, sortMode, loadingState, addPerson, removePerson, reorder, sortByBirth, sortByDeath } = useTimeline();
+  const { persons, sortMode, sortDir, loadingState, addPerson, removePerson, reorder, sortByBirth, sortByDeath, toggleSortDir } = useTimeline();
   const [copied, setCopied] = useState(false);
 
   const existingIds = useMemo(() => new Set(persons.map((p) => p.id)), [persons]);
@@ -82,10 +82,12 @@ export default function App() {
         <TimelineCanvas
           persons={persons}
           sortMode={sortMode}
+          sortDir={sortDir}
           onRemove={removePerson}
           onReorder={reorder}
           onSortByBirth={sortByBirth}
           onSortByDeath={sortByDeath}
+          onToggleSortDir={toggleSortDir}
           onAdd={addPerson}
           existingIds={existingIds}
         />
