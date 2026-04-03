@@ -126,38 +126,59 @@ export async function fetchEntityById(id) {
  * Fetch contemporaries:
  * - diedAtBirth: top 3 notable people who died within [birthYear ± range]
  * - bornAtDeath: top 3 notable people who were born within [deathYear ± range]
+ * Uses Wikipedia category API (fast) + wbgetentities for sitelink-based ranking.
  */
 export async function fetchContemporaries(personId, birthYear, deathYear, range = 15) {
-  function buildQuery(filterProp, yearCenter) {
-    const lo = yearCenter - range;
-    const hi = yearCenter + range;
-    return `
-SELECT DISTINCT ?entity ?entityLabel ?sitelinks WHERE {
-  ?entity wdt:P31 wd:Q5 .
-  ?entity wdt:${filterProp} ?date .
-  FILTER(YEAR(?date) >= ${lo} && YEAR(?date) <= ${hi})
-  FILTER(?entity != wd:${personId})
-  OPTIONAL { ?entity wikibase:sitelinks ?sitelinks }
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "en,de" }
-}
-ORDER BY DESC(?sitelinks)
-LIMIT 3`.trim();
-  }
+  async function fetchTopForYears(yearCenter, type) {
+    // type: "deaths" | "births"
+    const years = [];
+    for (let y = yearCenter - range; y <= yearCenter + range; y++) years.push(y);
 
-  const parseResult = (data) =>
-    data.results.bindings.map((b) => ({
-      id: b.entity.value.split("/").pop(),
-      name: b.entityLabel?.value || b.entity.value.split("/").pop(),
-      sitelinks: b.sitelinks ? parseInt(b.sitelinks.value) : 0,
+    // Fetch all year categories in parallel
+    const allTitles = new Set();
+    await Promise.all(years.map(async (year) => {
+      try {
+        const cat = `Category:${year}_${type}`;
+        const params = new URLSearchParams({
+          action: "query", list: "categorymembers",
+          cmtitle: cat, cmlimit: "50", cmtype: "page",
+          format: "json", origin: "*",
+        });
+        const resp = await fetch(`https://en.wikipedia.org/w/api.php?${params}`, {
+          headers: { "User-Agent": USER_AGENT },
+        });
+        const data = await resp.json();
+        (data.query?.categorymembers || []).forEach((m) => allTitles.add(m.title));
+      } catch { /* skip failed years */ }
     }));
 
-  const queries = [];
-  if (birthYear != null) queries.push(runSparqlQuery(buildQuery("P570", birthYear)).then(parseResult).catch(() => []));
-  else queries.push(Promise.resolve([]));
-  if (deathYear != null) queries.push(runSparqlQuery(buildQuery("P569", deathYear)).then(parseResult).catch(() => []));
-  else queries.push(Promise.resolve([]));
+    if (!allTitles.size) return [];
 
-  const [diedAtBirth, bornAtDeath] = await Promise.all(queries);
+    // Map Wikipedia titles → Wikidata entities + sitelink counts
+    const titles = [...allTitles].slice(0, 50).join("|");
+    const params = new URLSearchParams({
+      action: "wbgetentities", sites: "enwiki", titles,
+      props: "labels|sitelinks", languages: "en",
+      format: "json", origin: "*",
+    });
+    const resp = await fetch(`${SEARCH_API}?${params}`, { headers: { "User-Agent": USER_AGENT } });
+    const data = await resp.json();
+
+    return Object.values(data.entities || {})
+      .filter((e) => e.id && e.id !== personId && !e.missing)
+      .map((e) => ({
+        id: e.id,
+        name: e.labels?.en?.value || e.id,
+        sitelinks: e.sitelinks ? Object.keys(e.sitelinks).length : 0,
+      }))
+      .sort((a, b) => b.sitelinks - a.sitelinks)
+      .slice(0, 3);
+  }
+
+  const [diedAtBirth, bornAtDeath] = await Promise.all([
+    birthYear != null ? fetchTopForYears(birthYear, "deaths").catch(() => []) : Promise.resolve([]),
+    deathYear != null ? fetchTopForYears(deathYear, "births").catch(() => []) : Promise.resolve([]),
+  ]);
   return { diedAtBirth, bornAtDeath };
 }
 
