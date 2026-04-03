@@ -3,10 +3,25 @@ const SEARCH_API = "https://www.wikidata.org/w/api.php";
 const USER_AGENT = "ThoseBefore/1.0 (github.com/thosebefore)";
 
 /**
+ * Fetch with automatic retry on 429 (rate limit).
+ */
+async function fetchWithRetry(url, options = {}, retries = 2) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const resp = await fetch(url, options);
+    if (resp.status === 429 && attempt < retries) {
+      const wait = (attempt + 1) * 1000;
+      await new Promise((r) => setTimeout(r, wait));
+      continue;
+    }
+    return resp;
+  }
+}
+
+/**
  * Step 1: Fast text search via wbsearchentities API.
  * Returns up to `limit` candidate items with id, label, description.
  */
-export async function searchEntities(searchTerm, limit = 20) {
+export async function searchEntities(searchTerm, limit = 20, signal) {
   const params = new URLSearchParams({
     action: "wbsearchentities",
     search: searchTerm,
@@ -16,8 +31,9 @@ export async function searchEntities(searchTerm, limit = 20) {
     format: "json",
     origin: "*",
   });
-  const resp = await fetch(`${SEARCH_API}?${params}`, {
+  const resp = await fetchWithRetry(`${SEARCH_API}?${params}`, {
     headers: { "User-Agent": USER_AGENT },
+    signal,
   });
   if (!resp.ok) throw new Error(`Search API error: ${resp.status}`);
   const data = await resp.json();
@@ -32,7 +48,7 @@ export async function searchEntities(searchTerm, limit = 20) {
  * Step 2: SPARQL to get birth/death dates, sitelinks, and confirm P31=Q5 (human).
  * Operates on a known list of entity IDs.
  */
-export async function fetchPersonDetails(ids) {
+export async function fetchPersonDetails(ids, signal) {
   if (!ids.length) return [];
   const values = ids.map((id) => `wd:${id}`).join(" ");
   const query = `
@@ -45,7 +61,7 @@ SELECT ?entity ?birthDate ?deathDate ?sitelinks WHERE {
 }
 ORDER BY DESC(?sitelinks)
 `.trim();
-  const data = await runSparqlQuery(query);
+  const data = await runSparqlQuery(query, signal);
   const map = {};
   for (const b of data.results.bindings) {
     const id = b.entity.value.split("/").pop();
@@ -68,14 +84,15 @@ ORDER BY DESC(?sitelinks)
 /**
  * Combined: search for persons matching searchTerm, apply optional year filters.
  */
-export async function searchPersons(searchTerm, filters = {}) {
+export async function searchPersons(searchTerm, filters = {}, signal) {
   // 1. Fast text search
-  const candidates = await searchEntities(searchTerm, 30);
+  const candidates = await searchEntities(searchTerm, 30, signal);
   if (!candidates.length) return [];
+  if (signal?.aborted) return [];
 
   // 2. Fetch details + filter to humans only
   const ids = candidates.map((c) => c.id);
-  const detailsMap = await fetchPersonDetails(ids);
+  const detailsMap = await fetchPersonDetails(ids, signal);
 
   // 3. Merge + apply year filters + sort by sitelinks
   const results = candidates
@@ -238,13 +255,14 @@ LIMIT 12
   }));
 }
 
-export async function runSparqlQuery(query) {
+export async function runSparqlQuery(query, signal) {
   const url = `${SPARQL_ENDPOINT}?query=${encodeURIComponent(query)}&format=json`;
-  const resp = await fetch(url, {
+  const resp = await fetchWithRetry(url, {
     headers: {
       Accept: "application/sparql-results+json",
       "User-Agent": USER_AGENT,
     },
+    signal,
   });
   if (!resp.ok) throw new Error(`SPARQL error: ${resp.status}`);
   return resp.json();

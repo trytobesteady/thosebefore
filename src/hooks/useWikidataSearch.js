@@ -13,7 +13,7 @@ export function useWikidataSearch() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const debounceRef = useRef(null);
-  const requestIdRef = useRef(0);
+  const abortRef = useRef(null);
 
   useEffect(() => {
     if (!query || query.trim().length < 2) {
@@ -24,24 +24,30 @@ export function useWikidataSearch() {
 
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
-      const reqId = ++requestIdRef.current;
+      // Abort any previous in-flight request
+      abortRef.current?.abort();
+      abortRef.current = new AbortController();
+      const signal = abortRef.current.signal;
+
       setLoading(true);
       setError(null);
       try {
-        const persons = await searchPersons(query.trim(), filters);
-        // Ignore stale responses if a newer request was started
-        if (reqId !== requestIdRef.current) return;
+        const persons = await searchPersons(query.trim(), filters, signal);
+        if (signal.aborted) return;
         setResults(persons);
       } catch (e) {
-        if (reqId !== requestIdRef.current) return;
+        if (signal.aborted) return;
         setError(e.message);
         setResults([]);
       } finally {
-        if (reqId === requestIdRef.current) setLoading(false);
+        if (!signal.aborted) setLoading(false);
       }
-    }, 400);
+    }, 600);
 
-    return () => clearTimeout(debounceRef.current);
+    return () => {
+      clearTimeout(debounceRef.current);
+      abortRef.current?.abort();
+    };
   }, [query, filters]);
 
   return { query, setQuery, filters, setFilters, results, loading, error };
