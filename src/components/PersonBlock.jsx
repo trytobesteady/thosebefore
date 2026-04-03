@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { getColorForId } from "../utils/colors";
-import { fetchRelatedPersons, fetchEntityById } from "../utils/sparql";
+import { fetchRelatedPersons, fetchContemporaries, fetchEntityById } from "../utils/sparql";
 
 function formatDate(date) {
   if (!date) return "?";
@@ -50,7 +50,6 @@ function TooltipBox({ pos, onMouseEnter, onMouseLeave, children }) {
 
     let left = pos.blockMidX - w / 2;
     left = Math.max(MARGIN, Math.min(left, vw - w - MARGIN));
-
     setStyle({ visibility: "visible", top, left });
   }, [pos, children]);
 
@@ -73,13 +72,45 @@ function TooltipBox({ pos, onMouseEnter, onMouseLeave, children }) {
   );
 }
 
+// Reusable chip button for adding a person to the timeline
+function PersonChip({ person, onAdd, existingIds, addingId }) {
+  const already = existingIds?.has(person.id);
+  const loading = addingId === person.id;
+  return (
+    <button
+      className={`text-xs rounded px-1.5 py-0.5 flex items-center gap-1 transition-colors
+        ${already
+          ? "bg-base-200 text-base-content/30 cursor-default"
+          : "bg-base-200 text-base-content/70 hover:bg-primary hover:text-white cursor-pointer"
+        }`}
+      onClick={(e) => { e.stopPropagation(); if (!already && !addingId) onAdd(person); }}
+      disabled={already || !!addingId}
+      title={already ? "Bereits auf der Zeitleiste" : "Zur Zeitleiste hinzufügen"}
+    >
+      {loading && <span className="loading loading-spinner loading-xs" />}
+      {person.name}
+      {!already && !loading && <span className="opacity-50">+</span>}
+      {already && <span className="opacity-40">✓</span>}
+    </button>
+  );
+}
+
 export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, existingIds }) {
   const [tooltipPos, setTooltipPos] = useState(null);
+
+  // Related persons (family/influence)
   const [related, setRelated] = useState(null);
   const [relatedLoading, setRelatedLoading] = useState(false);
-  const [addingId, setAddingId] = useState(null); // which chip is currently loading
+  const relatedFetchedRef = useRef(null);
+
+  // Contemporaries
+  const [contemporaries, setContemporaries] = useState(null);
+  const [contemporariesLoading, setContemporariesLoading] = useState(false);
+  const [range, setRange] = useState(15);
+  const contemporariesFetchedRef = useRef(null); // tracks "id:range" key
+
+  const [addingId, setAddingId] = useState(null);
   const blockRef = useRef(null);
-  const fetchedForRef = useRef(null);
   const hideTimerRef = useRef(null);
   const color = getColorForId(person.id);
 
@@ -91,57 +122,48 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
   const wikiUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(person.name)}`;
   const wikidataUrl = `https://www.wikidata.org/wiki/${person.id}`;
 
-  const initials = person.name
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => w[0].toUpperCase())
-    .join("");
+  const initials = person.name.split(/\s+/).filter(Boolean).map((w) => w[0].toUpperCase()).join("");
+  const labelContent = widthPx > 60 ? person.name : widthPx > 20 ? initials : null;
 
-  const labelContent =
-    widthPx > 60 ? person.name :
-    widthPx > 20 ? initials :
-    null;
-
-  function scheduleHide() {
-    hideTimerRef.current = setTimeout(() => setTooltipPos(null), 200);
-  }
-
-  function cancelHide() {
-    clearTimeout(hideTimerRef.current);
-  }
-
+  function scheduleHide() { hideTimerRef.current = setTimeout(() => setTooltipPos(null), 200); }
+  function cancelHide() { clearTimeout(hideTimerRef.current); }
   function showTooltip() {
     cancelHide();
     const rect = blockRef.current?.getBoundingClientRect();
-    if (rect) setTooltipPos({
-      blockTop: rect.top,
-      blockBottom: rect.bottom,
-      blockMidX: rect.left + rect.width / 2,
-    });
+    if (rect) setTooltipPos({ blockTop: rect.top, blockBottom: rect.bottom, blockMidX: rect.left + rect.width / 2 });
   }
 
+  // Fetch related persons (once per person)
   useEffect(() => {
     if (!tooltipPos) return;
-    if (fetchedForRef.current === person.id) return;
-    fetchedForRef.current = person.id;
+    if (relatedFetchedRef.current === person.id) return;
+    relatedFetchedRef.current = person.id;
     setRelatedLoading(true);
     fetchRelatedPersons(person.id)
-      .then((data) => setRelated(data))
-      .catch(() => setRelated([]))
+      .then(setRelated).catch(() => setRelated([]))
       .finally(() => setRelatedLoading(false));
   }, [tooltipPos, person.id]);
 
-  async function handleAddRelated(relPerson) {
+  // Fetch contemporaries (re-fetches when range changes)
+  useEffect(() => {
+    if (!tooltipPos) return;
+    const key = `${person.id}:${range}`;
+    if (contemporariesFetchedRef.current === key) return;
+    contemporariesFetchedRef.current = key;
+    setContemporariesLoading(true);
+    fetchContemporaries(person.id, person.birthYear, person.deathYear, range)
+      .then(setContemporaries).catch(() => setContemporaries({ diedAtBirth: [], bornAtDeath: [] }))
+      .finally(() => setContemporariesLoading(false));
+  }, [tooltipPos, person.id, person.birthYear, person.deathYear, range]);
+
+  async function handleAdd(relPerson) {
     if (addingId || existingIds?.has(relPerson.id)) return;
     setAddingId(relPerson.id);
     try {
       const full = await fetchEntityById(relPerson.id);
       if (full) onAdd(full);
-    } catch {
-      // silently ignore
-    } finally {
-      setAddingId(null);
-    }
+    } catch { /* ignore */ }
+    finally { setAddingId(null); }
   }
 
   const groupedRelated = related ? groupBy(related, "relType") : null;
@@ -166,11 +188,12 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
 
       {tooltipPos && createPortal(
         <TooltipBox pos={tooltipPos} onMouseEnter={cancelHide} onMouseLeave={scheduleHide}>
+
+          {/* Header */}
           <div className="font-semibold text-sm mb-1">{person.name}</div>
           {person.description && (
             <div className="text-xs text-base-content/60 mb-1.5">{person.description}</div>
           )}
-
           <div className="text-xs text-base-content/70 space-y-0.5 mb-2">
             <div>* {formatDate(person.birthDate)}</div>
             <div>
@@ -180,73 +203,100 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
             </div>
           </div>
 
+          {/* Related persons */}
           {relatedLoading && (
-            <div className="text-xs text-base-content/30 flex items-center gap-1 mb-1">
-              <span className="loading loading-spinner loading-xs" />
-              Verwandte laden…
+            <div className="text-xs text-base-content/30 flex items-center gap-1">
+              <span className="loading loading-spinner loading-xs" /> Verwandte laden…
             </div>
           )}
-
           {groupedRelated && Object.keys(groupedRelated).length > 0 && (
             <div className="border-t border-base-200 pt-2 mt-1 space-y-1.5">
               {Object.entries(groupedRelated).map(([type, persons]) => (
                 <div key={type}>
-                  <span className="text-[10px] uppercase tracking-wide text-base-content/40 font-medium">
-                    {type}
-                  </span>
+                  <span className="text-[10px] uppercase tracking-wide text-base-content/40 font-medium">{type}</span>
                   <div className="flex flex-wrap gap-1 mt-0.5">
-                    {persons.map((r) => {
-                      const already = existingIds?.has(r.id);
-                      const loading = addingId === r.id;
-                      return (
-                        <button
-                          key={r.id}
-                          className={`text-xs rounded px-1.5 py-0.5 flex items-center gap-1 transition-colors
-                            ${already
-                              ? "bg-base-200 text-base-content/30 cursor-default"
-                              : "bg-base-200 text-base-content/70 hover:bg-primary hover:text-white cursor-pointer"
-                            }`}
-                          onClick={(e) => { e.stopPropagation(); handleAddRelated(r); }}
-                          disabled={already || !!addingId}
-                          title={already ? "Bereits auf der Zeitleiste" : "Zur Zeitleiste hinzufügen"}
-                        >
-                          {loading && <span className="loading loading-spinner loading-xs" />}
-                          {r.name}
-                          {!already && !loading && <span className="opacity-50">+</span>}
-                          {already && <span className="opacity-40">✓</span>}
-                        </button>
-                      );
-                    })}
+                    {persons.map((r) => (
+                      <PersonChip key={r.id} person={r} onAdd={handleAdd} existingIds={existingIds} addingId={addingId} />
+                    ))}
                   </div>
                 </div>
               ))}
             </div>
           )}
 
-          {groupedRelated && Object.keys(groupedRelated).length === 0 && (
-            <div className="text-xs text-base-content/30 border-t border-base-200 pt-2 mt-1">
-              Keine Verknüpfungen in Wikidata
+          {/* Contemporaries */}
+          <div className="border-t border-base-200 pt-2 mt-2">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] uppercase tracking-wide text-base-content/40 font-medium">Zeitgenossen</span>
+              <label className="flex items-center gap-1 text-[10px] text-base-content/40">
+                ±
+                <input
+                  type="number"
+                  className="input input-xs input-ghost w-12 text-center px-1 h-5 min-h-0"
+                  value={range}
+                  min={1}
+                  max={100}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => setRange(Math.max(1, Math.min(100, parseInt(e.target.value) || 15)))}
+                />
+                Jahre
+              </label>
             </div>
-          )}
 
-          <a
-            href={wikiUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-primary mt-2 block hover:underline"
-            onClick={(e) => e.stopPropagation()}
-          >
-            Wikipedia →
-          </a>
-          <a
-            href={wikidataUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-base-content/40 mt-0.5 block hover:underline"
-            onClick={(e) => e.stopPropagation()}
-          >
-            Wikidata ({person.id})
-          </a>
+            {contemporariesLoading && (
+              <div className="text-xs text-base-content/30 flex items-center gap-1">
+                <span className="loading loading-spinner loading-xs" /> Laden…
+              </div>
+            )}
+
+            {contemporaries && !contemporariesLoading && (
+              <div className="space-y-1.5">
+                {person.birthYear != null && (
+                  <div>
+                    <span className="text-[10px] text-base-content/40">
+                      † um {person.birthYear} — wer verließ die Bühne
+                    </span>
+                    <div className="flex flex-wrap gap-1 mt-0.5">
+                      {contemporaries.diedAtBirth.length > 0
+                        ? contemporaries.diedAtBirth.map((r) => (
+                            <PersonChip key={r.id} person={r} onAdd={handleAdd} existingIds={existingIds} addingId={addingId} />
+                          ))
+                        : <span className="text-xs text-base-content/30">–</span>
+                      }
+                    </div>
+                  </div>
+                )}
+                {person.deathYear != null && (
+                  <div>
+                    <span className="text-[10px] text-base-content/40">
+                      * um {person.deathYear} — wer betrat die Bühne
+                    </span>
+                    <div className="flex flex-wrap gap-1 mt-0.5">
+                      {contemporaries.bornAtDeath.length > 0
+                        ? contemporaries.bornAtDeath.map((r) => (
+                            <PersonChip key={r.id} person={r} onAdd={handleAdd} existingIds={existingIds} addingId={addingId} />
+                          ))
+                        : <span className="text-xs text-base-content/30">–</span>
+                      }
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Links */}
+          <div className="border-t border-base-200 pt-2 mt-2 space-y-0.5">
+            <a href={wikiUrl} target="_blank" rel="noopener noreferrer"
+              className="text-xs text-primary block hover:underline" onClick={(e) => e.stopPropagation()}>
+              Wikipedia →
+            </a>
+            <a href={wikidataUrl} target="_blank" rel="noopener noreferrer"
+              className="text-xs text-base-content/40 block hover:underline" onClick={(e) => e.stopPropagation()}>
+              Wikidata ({person.id})
+            </a>
+          </div>
+
         </TooltipBox>,
         document.body
       )}

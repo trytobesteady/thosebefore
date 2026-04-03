@@ -123,6 +123,45 @@ export async function fetchEntityById(id) {
 }
 
 /**
+ * Fetch contemporaries:
+ * - diedAtBirth: top 3 notable people who died within [birthYear ± range]
+ * - bornAtDeath: top 3 notable people who were born within [deathYear ± range]
+ */
+export async function fetchContemporaries(personId, birthYear, deathYear, range = 15) {
+  function buildQuery(filterProp, yearCenter) {
+    const lo = yearCenter - range;
+    const hi = yearCenter + range;
+    return `
+SELECT DISTINCT ?entity ?entityLabel ?sitelinks WHERE {
+  ?entity wdt:P31 wd:Q5 .
+  ?entity wdt:${filterProp} ?date .
+  FILTER(YEAR(?date) >= ${lo} && YEAR(?date) <= ${hi})
+  FILTER(?entity != wd:${personId})
+  OPTIONAL { ?entity wikibase:sitelinks ?sitelinks }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en,de" }
+}
+ORDER BY DESC(?sitelinks)
+LIMIT 3`.trim();
+  }
+
+  const parseResult = (data) =>
+    data.results.bindings.map((b) => ({
+      id: b.entity.value.split("/").pop(),
+      name: b.entityLabel?.value || b.entity.value.split("/").pop(),
+      sitelinks: b.sitelinks ? parseInt(b.sitelinks.value) : 0,
+    }));
+
+  const queries = [];
+  if (birthYear != null) queries.push(runSparqlQuery(buildQuery("P570", birthYear)).then(parseResult).catch(() => []));
+  else queries.push(Promise.resolve([]));
+  if (deathYear != null) queries.push(runSparqlQuery(buildQuery("P569", deathYear)).then(parseResult).catch(() => []));
+  else queries.push(Promise.resolve([]));
+
+  const [diedAtBirth, bornAtDeath] = await Promise.all(queries);
+  return { diedAtBirth, bornAtDeath };
+}
+
+/**
  * Fetch related persons for a given entity ID.
  * Returns array of { id, name, relType }
  */
