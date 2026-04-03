@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { getColorForId } from "../utils/colors";
-import { fetchRelatedPersons, fetchContemporaries, fetchEntityById } from "../utils/sparql";
+import { fetchRelatedPersons, fetchContemporaries, fetchEntityById, fetchPersonImage } from "../utils/sparql";
 
 function formatDate(date) {
   if (!date) return "?";
@@ -135,6 +135,10 @@ function PersonChip({ person, onAdd, existingIds, addingId }) {
 export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, existingIds }) {
   const [tooltipPos, setTooltipPos] = useState(null);
 
+  // Person image
+  const [image, setImage] = useState(undefined); // undefined = not loaded, null = no image
+  const imageFetchedRef = useRef(null);
+
   // Related persons (family/influence)
   const [related, setRelated] = useState(null);
   const [relatedLoading, setRelatedLoading] = useState(false);
@@ -160,7 +164,10 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
   const wikidataUrl = `https://www.wikidata.org/wiki/${person.id}`;
 
   const initials = person.name.split(/\s+/).filter(Boolean).map((w) => w[0].toUpperCase()).join("");
-  const labelContent = widthPx > 60 ? person.name : widthPx > 20 ? initials : null;
+  const showImage = image && widthPx > 80;
+  const showName = widthPx > (showImage ? 100 : 60);
+  const showInitials = !showName && widthPx > 20 && !showImage;
+  const labelContent = showName ? person.name : showInitials ? initials : null;
 
   function scheduleHide() { hideTimerRef.current = setTimeout(() => setTooltipPos(null), 200); }
   function cancelHide() { clearTimeout(hideTimerRef.current); }
@@ -169,6 +176,14 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
     const rect = blockRef.current?.getBoundingClientRect();
     if (rect) setTooltipPos({ blockTop: rect.top, blockBottom: rect.bottom, blockMidX: rect.left + rect.width / 2 });
   }
+
+  // Fetch image (once per person)
+  useEffect(() => {
+    if (!tooltipPos) return;
+    if (imageFetchedRef.current === person.id) return;
+    imageFetchedRef.current = person.id;
+    fetchPersonImage(person.name).then(setImage).catch(() => setImage(null));
+  }, [tooltipPos, person.id, person.name]);
 
   // Fetch related persons (once per person)
   useEffect(() => {
@@ -214,23 +229,47 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
       onMouseLeave={scheduleHide}
       onClick={() => window.open(wikiUrl, "_blank")}
     >
-      {labelContent && (
-        <span
-          className="px-1.5 text-white text-xs font-medium truncate leading-tight pointer-events-none w-full text-center"
-          style={{ textShadow: "0 1px 2px rgba(0,0,0,0.4)" }}
-        >
-          {labelContent}
-        </span>
+      {(showImage || labelContent) && (
+        <div className="flex items-center gap-1 px-1.5 w-full pointer-events-none overflow-hidden">
+          {showImage && (
+            <img
+              src={image}
+              alt={person.name}
+              className="rounded-full shrink-0 object-cover"
+              style={{ width: 24, height: 24, boxShadow: "0 0 0 1.5px rgba(255,255,255,0.5)" }}
+            />
+          )}
+          {labelContent && (
+            <span
+              className="text-white text-xs font-medium truncate leading-tight"
+              style={{ textShadow: "0 1px 2px rgba(0,0,0,0.4)" }}
+            >
+              {labelContent}
+            </span>
+          )}
+        </div>
       )}
 
       {tooltipPos && createPortal(
         <TooltipBox pos={tooltipPos} onMouseEnter={cancelHide} onMouseLeave={scheduleHide} onClose={() => setTooltipPos(null)}>
 
           {/* Header */}
-          <div className="font-semibold text-sm mb-1">{person.name}</div>
-          {person.description && (
-            <div className="text-xs text-base-content/60 mb-1.5">{person.description}</div>
-          )}
+          <div className="flex items-center gap-2 mb-1 pr-5">
+            {image && (
+              <img
+                src={image}
+                alt={person.name}
+                className="rounded-full shrink-0 object-cover"
+                style={{ width: 40, height: 40, boxShadow: "0 0 0 2px rgba(0,0,0,0.08)" }}
+              />
+            )}
+            <div className="min-w-0">
+              <div className="font-semibold text-sm leading-tight">{person.name}</div>
+              {person.description && (
+                <div className="text-xs text-base-content/60 mt-0.5 leading-tight">{person.description}</div>
+              )}
+            </div>
+          </div>
           <div className="text-xs text-base-content/70 space-y-0.5 mb-2">
             <div>* {formatDate(person.birthDate)}</div>
             <div>

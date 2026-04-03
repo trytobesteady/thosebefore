@@ -183,6 +183,25 @@ export async function fetchContemporaries(personId, birthYear, deathYear, range 
 }
 
 /**
+ * Fetch person thumbnail via Wikipedia REST summary API.
+ * Returns image URL string or null.
+ */
+export async function fetchPersonImage(name) {
+  try {
+    const title = encodeURIComponent(name.replace(/ /g, "_"));
+    const resp = await fetch(
+      `https://en.wikipedia.org/api/rest_v1/page/summary/${title}`,
+      { headers: { "User-Agent": USER_AGENT } }
+    );
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return data.thumbnail?.source ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Fetch related persons for a given entity ID.
  * Returns array of { id, name, relType }
  */
