@@ -15,6 +15,9 @@ dist-ssr
 # Claude Code
 .claude/
 
+# Local project context (for AI sessions)
+.context/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
