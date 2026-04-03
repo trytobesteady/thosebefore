@@ -27,6 +27,37 @@ function groupBy(arr, key) {
   }, {});
 }
 
+const TOOLTIP_WIDTH = 300;
+const TOOLTIP_ESTIMATED_HEIGHT = 220;
+const MARGIN = 8;
+
+function TooltipBox({ pos, children }) {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
+  // Vertical: prefer above, fall back to below
+  const showBelow = pos.blockTop < TOOLTIP_ESTIMATED_HEIGHT + MARGIN;
+  const top = showBelow
+    ? pos.blockBottom + MARGIN
+    : pos.blockTop - MARGIN;
+  const transform = showBelow ? "translateX(-50%)" : "translate(-50%, -100%)";
+
+  // Horizontal: clamp so tooltip never escapes viewport
+  let left = pos.blockMidX;
+  const halfW = TOOLTIP_WIDTH / 2;
+  if (left - halfW < MARGIN) left = halfW + MARGIN;
+  if (left + halfW > vw - MARGIN) left = vw - halfW - MARGIN;
+
+  return (
+    <div
+      className="fixed z-[9999] bg-base-100 border border-base-300 rounded-lg shadow-xl p-3 text-left pointer-events-none"
+      style={{ left, top, transform, minWidth: 220, maxWidth: TOOLTIP_WIDTH }}
+    >
+      {children}
+    </div>
+  );
+}
+
 export default function PersonBlock({ person, startYear, pixelsPerYear }) {
   const [tooltipPos, setTooltipPos] = useState(null);
   const [related, setRelated] = useState(null); // null = not loaded yet
@@ -81,7 +112,11 @@ export default function PersonBlock({ person, startYear, pixelsPerYear }) {
       ref={blockRef}
       onMouseEnter={() => {
         const rect = blockRef.current?.getBoundingClientRect();
-        if (rect) setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
+        if (rect) setTooltipPos({
+          blockTop: rect.top,
+          blockBottom: rect.bottom,
+          blockMidX: rect.left + rect.width / 2,
+        });
       }}
       onMouseLeave={() => setTooltipPos(null)}
       onClick={() => window.open(wikiUrl, "_blank")}
@@ -96,16 +131,8 @@ export default function PersonBlock({ person, startYear, pixelsPerYear }) {
       )}
 
       {tooltipPos && createPortal(
-        <div
-          className="fixed z-[9999] bg-base-100 border border-base-300 rounded-lg shadow-xl p-3 text-left pointer-events-none"
-          style={{
-            left: tooltipPos.x,
-            top: tooltipPos.y - 8,
-            transform: "translate(-50%, -100%)",
-            minWidth: 220,
-            maxWidth: 300,
-          }}
-        >
+        <TooltipBox pos={tooltipPos}>
+
           <div className="font-semibold text-sm mb-1">{person.name}</div>
           {person.description && (
             <div className="text-xs text-base-content/60 mb-1.5">{person.description}</div>
@@ -170,7 +197,7 @@ export default function PersonBlock({ person, startYear, pixelsPerYear }) {
           >
             Wikidata ({person.id})
           </a>
-        </div>,
+        </TooltipBox>,
         document.body
       )}
     </div>
