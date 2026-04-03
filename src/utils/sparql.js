@@ -199,35 +199,26 @@ export async function fetchContemporaries(personId, centerYear, mode, range = 5,
   const fromYear = centerYear - range;
   const toYear = centerYear + range;
 
-  // Step 1: get candidate IDs + sitelinks count via SPARQL (no ORDER BY — sort locally)
+  // Step 1: get candidate IDs via date-range SPARQL (no sitelinks join — causes 502)
   const query = `
-SELECT ?person ?sitelinks WHERE {
+SELECT DISTINCT ?person WHERE {
   ?person wdt:${property} ?date ;
           wdt:P31 wd:Q5 .
-  OPTIONAL { ?person wikibase:sitelinks ?sitelinks }
   FILTER(?date >= ${toSparqlDate(fromYear)} &&
          ?date < ${toSparqlDate(toYear + 1)} &&
          ?person != wd:${personId})
 }
-LIMIT 200
+LIMIT 50
 `.trim();
   const sparqlData = await runSparqlQuery(query);
-  if (!sparqlData.results.bindings.length) return [];
+  const ids = sparqlData.results.bindings.map((b) => b.person.value.split("/").pop());
+  if (!ids.length) return [];
 
-  // Sort all candidates locally by sitelinks DESC, take top N
-  const topIds = sparqlData.results.bindings
-    .map((b) => ({ id: b.person.value.split("/").pop(), sitelinks: b.sitelinks ? parseInt(b.sitelinks.value) : 0 }))
-    .sort((a, b) => b.sitelinks - a.sitelinks)
-    .slice(0, limit)
-    .map((e) => e.id);
-
-  if (!topIds.length) return [];
-
-  // Step 2: fetch labels + descriptions only for top N (small response)
+  // Step 2: fetch labels + descriptions + sitelinks in one batch (max 50 → always 1 request)
   const params = new URLSearchParams({
     action: "wbgetentities",
-    ids: topIds.join("|"),
-    props: "labels|descriptions",
+    ids: ids.join("|"),
+    props: "labels|descriptions|sitelinks",
     languages: "en",
     format: "json",
     origin: "*",
@@ -235,17 +226,16 @@ LIMIT 200
   const resp = await fetchWithRetry(`${SEARCH_API}?${params}`, { headers: { "User-Agent": USER_AGENT } });
   const data = await resp.json();
 
-  return topIds
-    .map((id) => {
-      const e = data.entities?.[id];
-      if (!e || e.missing) return null;
-      return {
-        id,
-        name: e.labels?.en?.value || id,
-        description: e.descriptions?.en?.value || "",
-      };
-    })
-    .filter(Boolean);
+  return Object.values(data.entities || {})
+    .filter((e) => e.id && !e.missing)
+    .map((e) => ({
+      id: e.id,
+      name: e.labels?.en?.value || e.id,
+      description: e.descriptions?.en?.value || "",
+      sitelinks: e.sitelinks ? Object.keys(e.sitelinks).length : 0,
+    }))
+    .sort((a, b) => b.sitelinks - a.sitelinks)
+    .slice(0, limit);
 }
 
 /**
