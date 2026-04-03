@@ -27,8 +27,8 @@ export default function TimelineRow({
     >
       {/* Label column */}
       <div
-        className="flex items-center gap-1.5 shrink-0 px-2 border-r border-base-200 bg-base-50 cursor-grab active:cursor-grabbing select-none"
-        style={{ width: 160 }}
+        className="flex items-center gap-1.5 shrink-0 px-2 border-r border-base-200 bg-base-100 cursor-grab active:cursor-grabbing select-none"
+        style={{ width: 160, position: "sticky", left: 0, zIndex: 1 }}
         draggable
         onDragStart={() => onDragStart(index)}
         title="Drag to reorder"
