@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { getColorForId } from "../utils/colors";
 import { fetchRelatedPersons } from "../utils/sparql";
@@ -28,30 +28,47 @@ function groupBy(arr, key) {
 }
 
 const TOOLTIP_WIDTH = 300;
-const TOOLTIP_ESTIMATED_HEIGHT = 220;
 const MARGIN = 8;
 
 function TooltipBox({ pos, children }) {
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
+  const ref = useRef(null);
+  const [style, setStyle] = useState({ visibility: "hidden", left: 0, top: 0 });
 
-  // Vertical: prefer above, fall back to below
-  const showBelow = pos.blockTop < TOOLTIP_ESTIMATED_HEIGHT + MARGIN;
-  const top = showBelow
-    ? pos.blockBottom + MARGIN
-    : pos.blockTop - MARGIN;
-  const transform = showBelow ? "translateX(-50%)" : "translate(-50%, -100%)";
+  useLayoutEffect(() => {
+    if (!ref.current) return;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const h = ref.current.offsetHeight;
+    const w = ref.current.offsetWidth;
 
-  // Horizontal: clamp so tooltip never escapes viewport
-  let left = pos.blockMidX;
-  const halfW = TOOLTIP_WIDTH / 2;
-  if (left - halfW < MARGIN) left = halfW + MARGIN;
-  if (left + halfW > vw - MARGIN) left = vw - halfW - MARGIN;
+    // Vertical: above if space, else below, else clamp to bottom
+    let top;
+    if (pos.blockTop - h - MARGIN >= 0) {
+      top = pos.blockTop - h - MARGIN;        // above
+    } else if (pos.blockBottom + h + MARGIN <= vh) {
+      top = pos.blockBottom + MARGIN;          // below
+    } else {
+      top = Math.max(MARGIN, vh - h - MARGIN); // clamp to bottom of viewport
+    }
+
+    // Horizontal: center on block, clamp to viewport edges
+    let left = pos.blockMidX - w / 2;
+    left = Math.max(MARGIN, Math.min(left, vw - w - MARGIN));
+
+    setStyle({ visibility: "visible", top, left });
+  }, [pos, children]);
 
   return (
     <div
+      ref={ref}
       className="fixed z-[9999] bg-base-100 border border-base-300 rounded-lg shadow-xl p-3 text-left pointer-events-none"
-      style={{ left, top, transform, minWidth: 220, maxWidth: TOOLTIP_WIDTH }}
+      style={{
+        ...style,
+        minWidth: 220,
+        maxWidth: TOOLTIP_WIDTH,
+        maxHeight: `calc(100vh - ${MARGIN * 2}px)`,
+        overflowY: "auto",
+      }}
     >
       {children}
     </div>
