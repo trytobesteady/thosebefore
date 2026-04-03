@@ -28,6 +28,34 @@ function groupBy(arr, key) {
 const TOOLTIP_WIDTH = 300;
 const MARGIN = 8;
 
+function CollapsibleSection({ title, loading, defaultOpen = false, children, right }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="border-t border-base-200 mt-2">
+      <button
+        className="flex items-center justify-between w-full pt-2 pb-1 text-left gap-1"
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+      >
+        <span className="text-[10px] uppercase tracking-wide text-base-content/40 font-medium flex items-center gap-1">
+          {title}
+          {loading && <span className="loading loading-spinner loading-xs ml-1" />}
+        </span>
+        <div className="flex items-center gap-1.5">
+          {right}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className={`h-3 w-3 text-base-content/30 transition-transform shrink-0 ${open ? "rotate-180" : ""}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </button>
+      {open && <div className="pb-2">{children}</div>}
+    </div>
+  );
+}
+
 function TooltipBox({ pos, onMouseEnter, onMouseLeave, children }) {
   const ref = useRef(null);
   const [style, setStyle] = useState({ visibility: "hidden", left: 0, top: 0 });
@@ -204,86 +232,74 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
           </div>
 
           {/* Related persons */}
-          {relatedLoading && (
-            <div className="text-xs text-base-content/30 flex items-center gap-1">
-              <span className="loading loading-spinner loading-xs" /> Verwandte laden…
-            </div>
-          )}
-          {groupedRelated && Object.keys(groupedRelated).length > 0 && (
-            <div className="border-t border-base-200 pt-2 mt-1 space-y-1.5">
-              {Object.entries(groupedRelated).map(([type, persons]) => (
-                <div key={type}>
-                  <span className="text-[10px] uppercase tracking-wide text-base-content/40 font-medium">{type}</span>
-                  <div className="flex flex-wrap gap-1 mt-0.5">
-                    {persons.map((r) => (
-                      <PersonChip key={r.id} person={r} onAdd={handleAdd} existingIds={existingIds} addingId={addingId} />
-                    ))}
+          <CollapsibleSection title="Verwandte &amp; Einflüsse" loading={relatedLoading} defaultOpen={true}>
+            {groupedRelated && Object.keys(groupedRelated).length > 0 ? (
+              <div className="space-y-1.5">
+                {Object.entries(groupedRelated).map(([type, persons]) => (
+                  <div key={type}>
+                    <span className="text-[10px] text-base-content/40">{type}</span>
+                    <div className="flex flex-wrap gap-1 mt-0.5">
+                      {persons.map((r) => (
+                        <PersonChip key={r.id} person={r} onAdd={handleAdd} existingIds={existingIds} addingId={addingId} />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            ) : !relatedLoading ? (
+              <span className="text-xs text-base-content/30">Keine Einträge in Wikidata</span>
+            ) : null}
+          </CollapsibleSection>
 
           {/* Contemporaries */}
-          <div className="border-t border-base-200 pt-2 mt-2">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] uppercase tracking-wide text-base-content/40 font-medium">Zeitgenossen</span>
-              <label className="flex items-center gap-1 text-[10px] text-base-content/40">
+          <CollapsibleSection
+            title="Zeitgenossen"
+            loading={contemporariesLoading}
+            defaultOpen={true}
+            right={
+              <label className="flex items-center gap-1 text-[10px] text-base-content/40" onClick={(e) => e.stopPropagation()}>
                 ±
                 <input
                   type="number"
-                  className="input input-xs input-ghost w-12 text-center px-1 h-5 min-h-0"
+                  className="input input-xs input-ghost w-10 text-center px-0.5 h-5 min-h-0"
                   value={range}
-                  min={1}
-                  max={100}
+                  min={1} max={25}
                   onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => setRange(Math.max(1, Math.min(100, parseInt(e.target.value) || 15)))}
+                  onChange={(e) => setRange(Math.max(1, Math.min(25, parseInt(e.target.value) || 15)))}
                 />
-                Jahre
+                J.
               </label>
-            </div>
-
-            {contemporariesLoading && (
-              <div className="text-xs text-base-content/30 flex items-center gap-1">
-                <span className="loading loading-spinner loading-xs" /> Laden…
-              </div>
-            )}
-
+            }
+          >
             {contemporaries && !contemporariesLoading && (
               <div className="space-y-1.5">
                 {person.birthYear != null && (
                   <div>
-                    <span className="text-[10px] text-base-content/40">
-                      † um {person.birthYear} — wer verließ die Bühne
-                    </span>
+                    <span className="text-[10px] text-base-content/40">† um {person.birthYear} — wer verließ die Bühne</span>
                     <div className="flex flex-wrap gap-1 mt-0.5">
                       {contemporaries.diedAtBirth.length > 0
                         ? contemporaries.diedAtBirth.map((r) => (
                             <PersonChip key={r.id} person={r} onAdd={handleAdd} existingIds={existingIds} addingId={addingId} />
                           ))
-                        : <span className="text-xs text-base-content/30">–</span>
-                      }
+                        : <span className="text-xs text-base-content/30">–</span>}
                     </div>
                   </div>
                 )}
                 {person.deathYear != null && (
                   <div>
-                    <span className="text-[10px] text-base-content/40">
-                      * um {person.deathYear} — wer betrat die Bühne
-                    </span>
+                    <span className="text-[10px] text-base-content/40">* um {person.deathYear} — wer betrat die Bühne</span>
                     <div className="flex flex-wrap gap-1 mt-0.5">
                       {contemporaries.bornAtDeath.length > 0
                         ? contemporaries.bornAtDeath.map((r) => (
                             <PersonChip key={r.id} person={r} onAdd={handleAdd} existingIds={existingIds} addingId={addingId} />
                           ))
-                        : <span className="text-xs text-base-content/30">–</span>
-                      }
+                        : <span className="text-xs text-base-content/30">–</span>}
                     </div>
                   </div>
                 )}
               </div>
             )}
-          </div>
+          </CollapsibleSection>
 
           {/* Links */}
           <div className="border-t border-base-200 pt-2 mt-2 space-y-0.5">
