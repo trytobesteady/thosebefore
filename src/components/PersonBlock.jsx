@@ -1,6 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { getColorForId } from "../utils/colors";
+import { fetchRelatedPersons } from "../utils/sparql";
 
 function formatDate(date) {
   if (!date) return "?";
@@ -18,9 +19,20 @@ function formatDate(date) {
     : `${d}.${m}.${year}`;
 }
 
-export default function PersonBlock({ person, startYear, totalYears, pixelsPerYear }) {
+// Group related persons by relType
+function groupBy(arr, key) {
+  return arr.reduce((acc, item) => {
+    (acc[item[key]] = acc[item[key]] || []).push(item);
+    return acc;
+  }, {});
+}
+
+export default function PersonBlock({ person, startYear, pixelsPerYear }) {
   const [tooltipPos, setTooltipPos] = useState(null);
+  const [related, setRelated] = useState(null); // null = not loaded yet
+  const [relatedLoading, setRelatedLoading] = useState(false);
   const blockRef = useRef(null);
+  const fetchedForRef = useRef(null);
   const color = getColorForId(person.id);
 
   const bYear = person.birthYear ?? startYear;
@@ -38,11 +50,24 @@ export default function PersonBlock({ person, startYear, totalYears, pixelsPerYe
     .map((w) => w[0].toUpperCase())
     .join("");
 
-  // >60px: full name  |  >20px: initials  |  ≤20px: nothing (just color)
   const labelContent =
     widthPx > 60 ? person.name :
     widthPx > 20 ? initials :
     null;
+
+  // Lazy-load related persons when tooltip first appears
+  useEffect(() => {
+    if (!tooltipPos) return;
+    if (fetchedForRef.current === person.id) return; // already fetched
+    fetchedForRef.current = person.id;
+    setRelatedLoading(true);
+    fetchRelatedPersons(person.id)
+      .then((data) => setRelated(data))
+      .catch(() => setRelated([]))
+      .finally(() => setRelatedLoading(false));
+  }, [tooltipPos, person.id]);
+
+  const groupedRelated = related ? groupBy(related, "relType") : null;
 
   return (
     <div
@@ -77,15 +102,16 @@ export default function PersonBlock({ person, startYear, totalYears, pixelsPerYe
             left: tooltipPos.x,
             top: tooltipPos.y - 8,
             transform: "translate(-50%, -100%)",
-            minWidth: 200,
-            maxWidth: 280,
+            minWidth: 220,
+            maxWidth: 300,
           }}
         >
           <div className="font-semibold text-sm mb-1">{person.name}</div>
           {person.description && (
             <div className="text-xs text-base-content/60 mb-1.5">{person.description}</div>
           )}
-          <div className="text-xs text-base-content/70 space-y-0.5">
+
+          <div className="text-xs text-base-content/70 space-y-0.5 mb-2">
             <div>* {formatDate(person.birthDate)}</div>
             <div>
               {person.deathDate != null
@@ -93,11 +119,46 @@ export default function PersonBlock({ person, startYear, totalYears, pixelsPerYe
                 : <span className="text-success">lebt noch</span>}
             </div>
           </div>
+
+          {/* Related persons */}
+          {relatedLoading && (
+            <div className="text-xs text-base-content/30 flex items-center gap-1 mb-1">
+              <span className="loading loading-spinner loading-xs" />
+              Verwandte laden…
+            </div>
+          )}
+          {groupedRelated && Object.keys(groupedRelated).length > 0 && (
+            <div className="border-t border-base-200 pt-2 mt-1 space-y-1">
+              {Object.entries(groupedRelated).map(([type, persons]) => (
+                <div key={type}>
+                  <span className="text-[10px] uppercase tracking-wide text-base-content/40 font-medium">
+                    {type}
+                  </span>
+                  <div className="flex flex-wrap gap-1 mt-0.5">
+                    {persons.map((r) => (
+                      <span
+                        key={r.id}
+                        className="text-xs bg-base-200 rounded px-1.5 py-0.5 text-base-content/70"
+                      >
+                        {r.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {groupedRelated && Object.keys(groupedRelated).length === 0 && (
+            <div className="text-xs text-base-content/30 border-t border-base-200 pt-2 mt-1">
+              Keine Verknüpfungen in Wikidata
+            </div>
+          )}
+
           <a
             href={wikiUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-primary mt-1.5 block hover:underline"
+            className="text-xs text-primary mt-2 block hover:underline"
           >
             Wikipedia →
           </a>

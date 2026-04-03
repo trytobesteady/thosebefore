@@ -122,6 +122,43 @@ export async function fetchEntityById(id) {
   return { id, name, description, ...detailsMap[id] };
 }
 
+/**
+ * Fetch related persons for a given entity ID.
+ * Returns array of { id, name, relType }
+ */
+export async function fetchRelatedPersons(id) {
+  const query = `
+SELECT DISTINCT ?rel ?relLabel ?relType WHERE {
+  VALUES ?person { wd:${id} }
+  {
+    ?person wdt:P26 ?rel . BIND("Ehepartner" AS ?relType)
+  } UNION {
+    ?person wdt:P40 ?rel . BIND("Kind" AS ?relType)
+  } UNION {
+    ?person wdt:P22 ?rel . BIND("Vater" AS ?relType)
+  } UNION {
+    ?person wdt:P25 ?rel . BIND("Mutter" AS ?relType)
+  } UNION {
+    ?person wdt:P3373 ?rel . BIND("Geschwister" AS ?relType)
+  } UNION {
+    ?person wdt:P1066 ?rel . BIND("Schüler von" AS ?relType)
+  } UNION {
+    ?person wdt:P802 ?rel . BIND("Schüler" AS ?relType)
+  } UNION {
+    ?person wdt:P737 ?rel . BIND("Beeinflusst von" AS ?relType)
+  }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "de,en" }
+}
+LIMIT 12
+`.trim();
+  const data = await runSparqlQuery(query);
+  return data.results.bindings.map((b) => ({
+    id: b.rel.value.split("/").pop(),
+    name: b.relLabel?.value || b.rel.value.split("/").pop(),
+    relType: b.relType?.value || "",
+  }));
+}
+
 export async function runSparqlQuery(query) {
   const url = `${SPARQL_ENDPOINT}?query=${encodeURIComponent(query)}&format=json`;
   const resp = await fetch(url, {
