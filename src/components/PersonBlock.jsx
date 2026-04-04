@@ -165,6 +165,7 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
   const [contempLoading, setContempLoading] = useState(false);
   const [contempMode, setContempMode] = useState(person.birthYear != null ? "deaths" : "births");
   const [range, setRange] = useState(5);
+  const MAX_RANGE = 10;
   const [contempLimit, setContempLimit] = useState(5);
 
   const [addingId, setAddingId] = useState(null);
@@ -356,15 +357,15 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
                   <input
                     type="number"
                     className="input input-xs input-ghost w-10 text-center px-0.5 h-5 min-h-0"
-                    value={range} min={1} max={50}
-                    onChange={(e) => setRange(Math.max(1, Math.min(50, parseInt(e.target.value) || 5)))}
+                    value={range} min={1} max={MAX_RANGE}
+                    onChange={(e) => setRange(Math.max(1, Math.min(MAX_RANGE, parseInt(e.target.value) || 5)))}
                   />
                   <span className="text-xs text-base-content/40">{t.years}</span>
                   <span className="text-xs text-base-content/20 mx-0.5">·</span>
                   <span className="text-xs text-base-content/40">{t.top}</span>
                   <input
                     type="number"
-                    className="input input-xs input-ghost w-8 text-center px-0.5 h-5 min-h-0"
+                    className="input input-xs input-ghost w-8 text-center px-0 h-5 min-h-0"
                     value={contempLimit} min={1} max={10}
                     onChange={(e) => setContempLimit(Math.max(1, Math.min(10, parseInt(e.target.value) || 5)))}
                   />
