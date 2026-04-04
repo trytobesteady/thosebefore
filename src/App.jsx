@@ -3,10 +3,12 @@ import SearchBar from "./components/SearchBar";
 import TimelineCanvas from "./components/TimelineCanvas";
 import { useTimeline } from "./hooks/useTimeline";
 import { encodeState } from "./utils/urlState";
+import { useLang } from "./i18n";
 
 export default function App() {
   const { persons, sortMode, sortDir, loadingState, addPerson, removePerson, reorder, sortByBirth, sortByDeath, toggleSortDir } = useTimeline();
   const [copied, setCopied] = useState(false);
+  const { t, lang, setLang } = useLang();
 
   const existingIds = useMemo(() => new Set(persons.map((p) => p.id)), [persons]);
 
@@ -25,7 +27,7 @@ export default function App() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      prompt("Kopiere diese URL:", url);
+      prompt(t.shareFallback, url);
     }
   }
 
@@ -33,33 +35,50 @@ export default function App() {
     <div className="h-screen flex flex-col bg-base-100" data-theme="light">
       {/* Header */}
       <header className="border-b border-base-200 bg-base-100 shrink-0">
-        {/* Row 1: title left, share right */}
+        {/* Row 1: title left, lang switch + share right */}
         <div className="flex items-center justify-between px-4 pt-2.5 pb-1">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-lg tracking-tight text-base-content">Biographical Timeline</span>
+            <span className="font-bold text-lg tracking-tight text-base-content">{t.appTitle}</span>
           </div>
-          <button
-            className={`btn btn-sm ${copied ? "btn-success" : "btn-outline"}`}
-            onClick={handleShare}
-            disabled={persons.length === 0}
-            title="Copy URL to clipboard"
-          >
-            {copied ? (
-              <>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                Copied!
-              </>
-            ) : (
-              <>
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                </svg>
-                Share
-              </>
-            )}
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Language toggle */}
+            <div className="join">
+              <button
+                className={`join-item btn btn-xs ${lang === "en" ? "btn-primary" : "btn-ghost border border-base-300"}`}
+                onClick={() => setLang("en")}
+              >
+                EN
+              </button>
+              <button
+                className={`join-item btn btn-xs ${lang === "de" ? "btn-primary" : "btn-ghost border border-base-300"}`}
+                onClick={() => setLang("de")}
+              >
+                DE
+              </button>
+            </div>
+            <button
+              className={`btn btn-sm ${copied ? "btn-success" : "btn-outline"}`}
+              onClick={handleShare}
+              disabled={persons.length === 0}
+              title={t.shareTitle}
+            >
+              {copied ? (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  {t.copied}
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                  </svg>
+                  {t.share}
+                </>
+              )}
+            </button>
+          </div>
         </div>
         {/* Row 2: search centered */}
         <div className="flex justify-center px-4 pb-2.5">
@@ -73,7 +92,7 @@ export default function App() {
       {loadingState && (
         <div className="fixed inset-0 z-[10000] bg-base-100/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
           <span className="loading loading-spinner loading-lg text-primary" />
-          <div className="font-medium text-base-content">Loading timeline…</div>
+          <div className="font-medium text-base-content">{t.loadingTimeline}</div>
         </div>
       )}
 
@@ -95,8 +114,8 @@ export default function App() {
 
       {persons.length > 0 && (
         <footer className="border-t border-base-200 px-4 py-1.5 text-xs text-base-content/30 flex gap-4 shrink-0">
-          <span>{persons.length} person{persons.length !== 1 ? "s" : ""}</span>
-          <span>Data: Wikidata (CC0)</span>
+          <span>{t.personCount(persons.length)}</span>
+          <span>{t.dataCredit}</span>
         </footer>
       )}
     </div>

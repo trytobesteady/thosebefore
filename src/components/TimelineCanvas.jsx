@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import TimelineRow from "./TimelineRow";
+import { useLang } from "../i18n";
 
 const LABEL_WIDTH = 160;
 const ROW_HEIGHT = 44;
@@ -57,6 +58,7 @@ export default function TimelineCanvas({
   const dragIndexRef = useRef(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
   const [zoom, setZoom] = useState(1);
+  const { t } = useLang();
 
   const { startYear, endYear, totalYears } = computeTimeRange(persons);
   const baseWidth = 900;
@@ -87,43 +89,43 @@ export default function TimelineCanvas({
     <div className="flex flex-col flex-1 min-h-0">
       {/* Toolbar */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-base-200 bg-base-100 flex-wrap">
-        <span className="text-xs text-base-content/50 font-medium uppercase tracking-wide mr-1">Sort:</span>
+        <span className="text-xs text-base-content/50 font-medium uppercase tracking-wide mr-1">{t.sort}</span>
         <div className="join">
           <button
             className={`join-item btn btn-xs ${sortMode === "birth" ? "btn-primary" : "btn-ghost border border-base-300"}`}
             onClick={() => onSortByBirth(sortMode === "birth" ? sortDir : "asc")}
           >
-            By birth
+            {t.byBirth}
           </button>
           <button
             className={`join-item btn btn-xs ${sortMode === "death" ? "btn-primary" : "btn-ghost border border-base-300"}`}
             onClick={() => onSortByDeath(sortMode === "death" ? sortDir : "asc")}
           >
-            By death
+            {t.byDeath}
           </button>
           <button
             className={`join-item btn btn-xs ${sortMode === "manual" ? "btn-primary" : "btn-ghost border border-base-300"}`}
             disabled
           >
-            Manual
+            {t.manual}
           </button>
         </div>
         {(sortMode === "birth" || sortMode === "death") && (
           <button
             className="btn btn-xs btn-ghost border border-base-300"
             onClick={onToggleSortDir}
-            title={sortDir === "asc" ? "Ascending — click to reverse" : "Descending — click to reverse"}
+            title={sortDir === "asc" ? t.ascending : t.descending}
           >
             {sortDir === "asc" ? "↑" : "↓"}
           </button>
         )}
 
         <div className="ml-auto flex items-center gap-2">
-          <span className="text-xs text-base-content/50">Zoom:</span>
+          <span className="text-xs text-base-content/50">{t.zoom}</span>
           <button className="btn btn-xs btn-ghost" onClick={() => setZoom((z) => Math.max(0.2, z - 0.2))}>−</button>
           <span className="text-xs w-10 text-center">{Math.round(zoom * 100)}%</span>
           <button className="btn btn-xs btn-ghost" onClick={() => setZoom((z) => Math.min(10, z + 0.2))}>+</button>
-          <button className="btn btn-xs btn-ghost" onClick={() => setZoom(1)}>Reset</button>
+          <button className="btn btn-xs btn-ghost" onClick={() => setZoom(1)}>{t.zoomReset}</button>
         </div>
       </div>
 
@@ -132,7 +134,7 @@ export default function TimelineCanvas({
           <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
-          <span>Search for people and add them to the timeline</span>
+          <span>{t.emptyHint}</span>
         </div>
       ) : (
         <div ref={scrollRef} className="flex-1 overflow-auto">
@@ -173,7 +175,7 @@ export default function TimelineCanvas({
                     >
                       <div className="w-px h-1.5 bg-base-400 bg-base-content/30" />
                       <span className="text-xs text-base-content/40 mt-0.5 whitespace-nowrap">
-                        {year < 0 ? `${Math.abs(year)} v. Chr.` : year}
+                        {year < 0 ? t.bce(Math.abs(year)) : year}
                       </span>
                     </div>
                   );

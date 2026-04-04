@@ -246,8 +246,7 @@ export async function fetchPersonImage(name) {
   try {
     const title = encodeURIComponent(name.replace(/ /g, "_"));
     const resp = await fetch(
-      `https://en.wikipedia.org/api/rest_v1/page/summary/${title}`,
-      { headers: { "User-Agent": USER_AGENT } }
+      `https://en.wikipedia.org/api/rest_v1/page/summary/${title}`
     );
     if (!resp.ok) return null;
     const data = await resp.json();
@@ -263,7 +262,7 @@ export async function fetchPersonImage(name) {
  */
 export async function fetchRelatedPersons(id) {
   const query = `
-SELECT DISTINCT ?rel ?relLabel ?relType WHERE {
+SELECT DISTINCT ?rel ?relLabel ?relDescription ?relType WHERE {
   VALUES ?person { wd:${id} }
   {
     ?person wdt:P26 ?rel . BIND("Spouse" AS ?relType)
@@ -290,6 +289,7 @@ LIMIT 12
   return data.results.bindings.map((b) => ({
     id: b.rel.value.split("/").pop(),
     name: b.relLabel?.value || b.rel.value.split("/").pop(),
+    description: b.relDescription?.value || "",
     relType: b.relType?.value || "",
   }));
 }

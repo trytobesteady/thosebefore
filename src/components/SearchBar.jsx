@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useWikidataSearch } from "../hooks/useWikidataSearch";
+import { useLang } from "../i18n";
 
 export default function SearchBar({ onAdd, existingIds }) {
   const { query, setQuery, filters, setFilters, results, loading, error } = useWikidataSearch();
@@ -7,6 +8,7 @@ export default function SearchBar({ onAdd, existingIds }) {
   const [showFilters, setShowFilters] = useState(false);
   const containerRef = useRef(null);
   const inputRef = useRef(null);
+  const { t } = useLang();
 
   useEffect(() => {
     setOpen(results.length > 0 || (query.length >= 2 && !loading));
@@ -49,7 +51,7 @@ export default function SearchBar({ onAdd, existingIds }) {
             ref={inputRef}
             type="text"
             className="input input-bordered w-full pr-10"
-            placeholder="Search for a person (e.g. Leonardo da Vinci)…"
+            placeholder={t.searchPlaceholder}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onFocus={() => results.length > 0 && setOpen(true)}
@@ -65,23 +67,23 @@ export default function SearchBar({ onAdd, existingIds }) {
         <button
           className={`btn btn-sm btn-ghost ${showFilters ? "btn-active" : ""}`}
           onClick={() => setShowFilters((v) => !v)}
-          title="Filter"
+          title={t.filter}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 010 2H4a1 1 0 01-1-1zm3 6a1 1 0 011-1h10a1 1 0 010 2H7a1 1 0 01-1-1zm4 6a1 1 0 011-1h2a1 1 0 010 2h-2a1 1 0 01-1-1z" />
           </svg>
-          Filter
+          {t.filter}
         </button>
       </div>
 
       {showFilters && (
         <div className="mt-2 p-3 bg-base-200 rounded-lg flex flex-col gap-2 text-sm">
           <div className="flex items-center gap-2">
-            <span className="text-base-content/60 w-16 shrink-0">Birth</span>
+            <span className="text-base-content/60 w-16 shrink-0">{t.birth}</span>
             <input
               type="number"
               className="input input-bordered input-xs w-24"
-              placeholder="von"
+              placeholder={t.filterFrom}
               value={filters.birthYearMin}
               onChange={(e) => updateFilter("birthYearMin", e.target.value)}
             />
@@ -89,17 +91,17 @@ export default function SearchBar({ onAdd, existingIds }) {
             <input
               type="number"
               className="input input-bordered input-xs w-24"
-              placeholder="bis"
+              placeholder={t.filterTo}
               value={filters.birthYearMax}
               onChange={(e) => updateFilter("birthYearMax", e.target.value)}
             />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-base-content/60 w-16 shrink-0">Death</span>
+            <span className="text-base-content/60 w-16 shrink-0">{t.death}</span>
             <input
               type="number"
               className="input input-bordered input-xs w-24"
-              placeholder="von"
+              placeholder={t.filterFrom}
               value={filters.deathYearMin}
               onChange={(e) => updateFilter("deathYearMin", e.target.value)}
             />
@@ -107,7 +109,7 @@ export default function SearchBar({ onAdd, existingIds }) {
             <input
               type="number"
               className="input input-bordered input-xs w-24"
-              placeholder="bis"
+              placeholder={t.filterTo}
               value={filters.deathYearMax}
               onChange={(e) => updateFilter("deathYearMax", e.target.value)}
             />
@@ -119,7 +121,7 @@ export default function SearchBar({ onAdd, existingIds }) {
         <ul className="absolute z-50 mt-1 w-full bg-base-100 border border-base-300 rounded-lg shadow-xl overflow-auto max-h-80">
           {results.length === 0 && !loading && query.length >= 2 ? (
             <li className="px-4 py-3 text-base-content/50 text-sm">
-              {error ? `Error: ${error}` : "No results"}
+              {error ? `${t.errorPrefix} ${error}` : t.noResults}
             </li>
           ) : (
             results.map((person) => {
@@ -139,10 +141,10 @@ export default function SearchBar({ onAdd, existingIds }) {
                       <div className="text-xs text-base-content/50 mt-0.5">
                         {person.birthYear != null ? person.birthYear : "?"}
                         {" – "}
-                        {person.deathYear != null ? person.deathYear : "still living"}
+                        {person.deathYear != null ? person.deathYear : t.stillLiving}
                       </div>
                     </div>
-                    {already && <span className="badge badge-sm badge-ghost shrink-0">already added</span>}
+                    {already && <span className="badge badge-sm badge-ghost shrink-0">{t.alreadyAdded}</span>}
                   </div>
                 </li>
               );

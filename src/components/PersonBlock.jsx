@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { getColorForId } from "../utils/colors";
 import { fetchRelatedPersons, fetchContemporaries, fetchEntityById, fetchPersonImage } from "../utils/sparql";
+import { useLang } from "../i18n";
 
 // Session-level caches — survive tooltip close/reopen and component remounts
 const _imageCache = new Map();
@@ -124,7 +125,7 @@ function TooltipBox({ pos, onClose, children }) {
 }
 
 // Reusable chip button for adding a person to the timeline
-function PersonChip({ person, onAdd, existingIds, addingId }) {
+function PersonChip({ person, onAdd, existingIds, addingId, t }) {
   const already = existingIds?.has(person.id);
   const loading = addingId === person.id;
   return (
@@ -136,7 +137,7 @@ function PersonChip({ person, onAdd, existingIds, addingId }) {
         }`}
       onClick={(e) => { e.stopPropagation(); if (!already && !addingId) onAdd(person); }}
       disabled={already || !!addingId}
-      title={already ? "Already on timeline" : person.description ? `${person.description.charAt(0).toUpperCase() + person.description.slice(1)} — Add to timeline` : "Add to timeline"}
+      title={already ? t.alreadyOnTimeline : person.description ? t.addToTimelineWithDesc(person.description.charAt(0).toUpperCase() + person.description.slice(1)) : t.addToTimeline}
     >
       {loading && <span className="loading loading-spinner loading-xs" />}
       {person.name}
@@ -148,6 +149,7 @@ function PersonChip({ person, onAdd, existingIds, addingId }) {
 
 export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, existingIds }) {
   const [tooltipPos, setTooltipPos] = useState(null);
+  const { t } = useLang();
 
   // Person image
   const [image, setImage] = useState(() => _imageCache.has(person.id) ? _imageCache.get(person.id) : undefined);
@@ -292,32 +294,32 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
             <div>
               {person.deathDate != null
                 ? <>† {formatDate(person.deathDate)}</>
-                : <span className="text-success">still alive</span>}
+                : <span className="text-success">{t.stillAlive}</span>}
             </div>
           </div>
 
           {/* Related persons */}
-          <CollapsibleSection title="Relations &amp; Influences" loading={relatedLoading} defaultOpen={false} onFirstOpen={loadRelated}>
+          <CollapsibleSection title={t.relationsInfluences} loading={relatedLoading} defaultOpen={false} onFirstOpen={loadRelated}>
             {groupedRelated && Object.keys(groupedRelated).length > 0 ? (
               <div className="space-y-1.5">
                 {Object.entries(groupedRelated).map(([type, persons]) => (
                   <div key={type}>
-                    <span className="text-xs text-base-content/40">{type}</span>
+                    <span className="text-xs text-base-content/40">{t.relType(type)}</span>
                     <div className="flex flex-wrap gap-1 mt-0.5">
                       {persons.map((r) => (
-                        <PersonChip key={r.id} person={r} onAdd={handleAdd} existingIds={existingIds} addingId={addingId} />
+                        <PersonChip key={r.id} person={r} onAdd={handleAdd} existingIds={existingIds} addingId={addingId} t={t} />
                       ))}
                     </div>
                   </div>
                 ))}
               </div>
             ) : !relatedLoading ? (
-              <span className="text-xs text-base-content/30">No entries in Wikidata</span>
+              <span className="text-xs text-base-content/30">{t.noWikidataEntries}</span>
             ) : null}
           </CollapsibleSection>
 
           {/* Contemporaries */}
-          <CollapsibleSection title="Contemporaries" loading={contempLoading} defaultOpen={false}>
+          <CollapsibleSection title={t.contemporaries} loading={contempLoading} defaultOpen={false}>
             <div className="space-y-2 pt-0.5" onClick={(e) => e.stopPropagation()}>
               {/* Controls */}
               <div className="flex flex-col gap-1.5">
@@ -331,7 +333,7 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
                       onChange={() => setContempMode("deaths")}
                     />
                     <span className={`text-xs ${person.birthYear == null ? "text-base-content/30" : "text-base-content/60"}`}>
-                      Birth{person.birthYear != null ? ` (${person.birthYear})` : ""}
+                      {t.birthLabel}{person.birthYear != null ? ` (${person.birthYear})` : ""}
                     </span>
                   </label>
                   <label className="flex items-center gap-1 cursor-pointer">
@@ -343,7 +345,7 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
                       onChange={() => setContempMode("births")}
                     />
                     <span className={`text-xs ${person.deathYear == null ? "text-base-content/30" : "text-base-content/60"}`}>
-                      Death{person.deathYear != null ? ` (${person.deathYear})` : ""}
+                      {t.deathLabel}{person.deathYear != null ? ` (${person.deathYear})` : ""}
                     </span>
                   </label>
                 </div>
@@ -355,9 +357,9 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
                     value={range} min={1} max={50}
                     onChange={(e) => setRange(Math.max(1, Math.min(50, parseInt(e.target.value) || 5)))}
                   />
-                  <span className="text-xs text-base-content/40">Years</span>
+                  <span className="text-xs text-base-content/40">{t.years}</span>
                   <span className="text-xs text-base-content/20 mx-0.5">·</span>
-                  <span className="text-xs text-base-content/40">Top</span>
+                  <span className="text-xs text-base-content/40">{t.top}</span>
                   <input
                     type="number"
                     className="input input-xs input-ghost w-8 text-center px-0.5 h-5 min-h-0"
@@ -369,7 +371,7 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
                     onClick={searchContemporaries}
                     disabled={contempLoading || (contempMode === "deaths" ? person.birthYear == null : person.deathYear == null)}
                   >
-                    {contempLoading ? <span className="loading loading-spinner loading-xs" /> : "Search"}
+                    {contempLoading ? <span className="loading loading-spinner loading-xs" /> : t.search}
                   </button>
                 </div>
               </div>
@@ -379,10 +381,9 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
                 if (centerYear == null) return null;
                 const from = centerYear - range;
                 const to = centerYear + range;
-                const verb = contempMode === "deaths" ? "People who died" : "People born";
                 return (
                   <p className="text-xs text-base-content/40 italic">
-                    {verb} between {from} – {to}
+                    {contempMode === "deaths" ? t.peopleDied(from, to) : t.peopleBorn(from, to)}
                   </p>
                 );
               })()}
@@ -391,9 +392,9 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
                 <div className="flex flex-wrap gap-1">
                   {contempResults.length > 0
                     ? contempResults.map((r) => (
-                        <PersonChip key={r.id} person={r} onAdd={handleAdd} existingIds={existingIds} addingId={addingId} />
+                        <PersonChip key={r.id} person={r} onAdd={handleAdd} existingIds={existingIds} addingId={addingId} t={t} />
                       ))
-                    : <span className="text-xs text-base-content/30">No results</span>}
+                    : <span className="text-xs text-base-content/30">{t.noResults}</span>}
                 </div>
               )}
             </div>
