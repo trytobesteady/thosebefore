@@ -1,54 +1,51 @@
-# Those Before
+# thosebefore
 
-Eine interaktive Zeitleiste, auf der historische Personen aus der Wikidata-Datenbank gesucht und als farbige Blöcke auf einer gemeinsamen Zeitachse dargestellt werden.
+An interactive biographical timeline powered by [Wikidata](https://www.wikidata.org/).
 
-![Those Before Screenshot](https://github.com/trytobesteady/thosebefore/raw/master/public/favicon.svg)
+**Live:** [bennybaum.de/thosebefore](https://bennybaum.de/thosebefore/)
+
+## What it does
+
+Search for historical persons and place them on a shared timeline. For each person you can open a detail modal and explore:
+
+- **Relations & Influences** — family members, teachers, students, and intellectual influences
+- **Contemporaries** — notable people who were born or died around the same time (configurable year range and result count)
+- **Same Field** — prominent people sharing an occupation, filtered by birth year ± 50 years
+
+Timelines are shareable via URL. The UI language can be switched between English and German (persisted via cookie); Wikidata labels and descriptions switch accordingly.
+
+## Tech stack
+
+- **React 19** + **Vite 8** — no server-side rendering, fully client-side
+- **Tailwind CSS v3** + **daisyUI v4**
+- **No backend** — all data fetched at runtime from public Wikidata APIs:
+  - [Wikidata SPARQL endpoint](https://query.wikidata.org/) for structured queries
+  - [wbsearchentities](https://www.wikidata.org/w/api.php) for fast text search
+  - [wbgetentities](https://www.wikidata.org/w/api.php) for labels, descriptions, and sitelink-based ranking
+  - [Wikipedia REST API](https://en.wikipedia.org/api/rest_v1/) for person thumbnails
 
 ## Features
 
-- **Personensuche** via Wikidata — Autocomplete mit Debounce, sortiert nach Relevanz (Sitelinks)
-- **Zeitleiste** — jede Person bekommt eine eigene Reihe, der Block ist proportional zur Lebensdauer
-- **Tooltip** — zeigt exaktes Geburts- und Todesdatum sowie einen Link zu Wikipedia
-- **Sortierung** — nach Geburtsjahr, Todesjahr oder manuell per Drag & Drop
-- **Zoom** — Zeitachse stufenlos skalierbar
-- **URL-State** — aktuelle Personenauswahl als URL-Parameter teilbar (`?p=Q762,Q5592`)
-- **Datenquelle** — [Wikidata](https://www.wikidata.org) (CC0), kein Backend nötig
+- Add/remove persons; sort by birth year, death year, or drag-and-drop manual order
+- Ascending/descending sort toggle
+- Zoom control for the timeline axis
+- Person modal: thumbnail, Wikipedia link, three expandable sections (Relations & Influences, Contemporaries, Same Field)
+- Shareable URLs (`?p=Q762,Q5592,…`) encoding the full current selection
+- DE/EN language switch
 
-## Tech Stack
-
-- [React 18](https://react.dev) + [Vite](https://vite.dev)
-- [Tailwind CSS v3](https://tailwindcss.com)
-- [daisyUI v4](https://daisyui.com)
-
-## Setup
-
-**Voraussetzungen:** Node.js 18+
+## Development
 
 ```bash
-# Abhängigkeiten installieren
 npm install
-
-# Entwicklungsserver starten
-npm run dev
+npm run dev       # dev server at http://localhost:5173
+npm run build     # production build
+npm run preview   # preview production build locally
 ```
 
-Die App läuft dann unter [http://localhost:5173](http://localhost:5173).
+## Deployment
 
-```bash
-# Produktions-Build erstellen
-npm run build
+GitHub Actions builds and deploys to `bennybaum.de/thosebefore/` via FTP on every push to `master`. See [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
 
-# Build lokal vorschauen
-npm run preview
-```
+## Data
 
-## Verwendung
-
-1. Person im Suchfeld eingeben (mind. 2 Zeichen)
-2. Ergebnis aus der Dropdown-Liste auswählen → Person erscheint auf der Zeitleiste
-3. Reihen per Drag & Drop umsortieren oder die Sortier-Buttons nutzen
-4. Mit dem **Teilen**-Button die aktuelle URL in die Zwischenablage kopieren
-
-## Daten
-
-Alle Daten stammen von [Wikidata](https://www.wikidata.org) und stehen unter der [CC0-Lizenz](https://creativecommons.org/publicdomain/zero/1.0/).
+All biographical data is sourced from [Wikidata](https://www.wikidata.org/) under the [CC0 1.0 license](https://creativecommons.org/publicdomain/zero/1.0/).
