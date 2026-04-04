@@ -177,7 +177,7 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
   const leftPx = (bYear - startYear) * pixelsPerYear;
   const widthPx = Math.max((dYear - bYear) * pixelsPerYear, 4);
 
-  const wikiUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(person.name)}`;
+  const wikiUrl = `https://en.wikipedia.org/wiki/${encodeURIComponent(person.nameEn || person.name)}`;
   const wikidataUrl = `https://www.wikidata.org/wiki/${person.id}`;
 
   const initials = person.name.split(/\s+/).filter(Boolean).map((w) => w[0].toUpperCase()).join("");
@@ -200,7 +200,7 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
   useEffect(() => {
     if (imageFetchedRef.current === person.id) return;
     imageFetchedRef.current = person.id;
-    fetchPersonImage(person.name).then((url) => {
+    fetchPersonImage(person.nameEn || person.name).then((url) => {
       _imageCache.set(person.id, url ?? null);
       setImage(url ?? null);
     }).catch(() => { _imageCache.set(person.id, null); setImage(null); });
@@ -234,7 +234,7 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
     if (addingId || existingIds?.has(relPerson.id)) return;
     setAddingId(relPerson.id);
     try {
-      const full = await fetchEntityById(relPerson.id);
+      const full = await fetchEntityById(relPerson.id, lang);
       if (full) onAdd(full);
     } catch { /* ignore */ }
     finally { setAddingId(null); }

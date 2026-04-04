@@ -1,6 +1,7 @@
 import { useReducer, useEffect, useState } from "react";
 import { decodeState } from "../utils/urlState";
 import { fetchEntitiesByIds } from "../utils/sparql";
+import { useLang } from "../i18n";
 
 function reducer(state, action) {
   switch (action.type) {
@@ -44,6 +45,7 @@ function reducer(state, action) {
 }
 
 export function useTimeline() {
+  const { lang } = useLang();
   const [state, dispatch] = useReducer(reducer, { persons: [], sortMode: "manual", sortDir: "asc" });
   const [loadingState, setLoadingState] = useState(() => {
     const ids = decodeState(window.location.search);
@@ -60,7 +62,7 @@ export function useTimeline() {
 
     (async () => {
       try {
-        const persons = await fetchEntitiesByIds(ids);
+        const persons = await fetchEntitiesByIds(ids, lang);
         if (cancelled) return;
         if (persons.length > 0) dispatch({ type: "SET_PERSONS", persons });
       } catch {

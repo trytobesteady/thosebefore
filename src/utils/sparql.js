@@ -131,7 +131,7 @@ export async function searchPersons(searchTerm, filters = {}, signal) {
  * Lookup multiple entities by Wikidata ID in batch (used for URL state restore).
  * Returns persons in the same order as the input ids array.
  */
-export async function fetchEntitiesByIds(ids) {
+export async function fetchEntitiesByIds(ids, lang = "en") {
   if (!ids.length) return [];
 
   // 1 SPARQL call for all IDs
@@ -146,18 +146,20 @@ export async function fetchEntitiesByIds(ids) {
       action: "wbgetentities",
       ids: batch.join("|"),
       props: "labels|descriptions",
-      languages: "en",
       format: "json",
       origin: "*",
     });
-    const resp = await fetchWithRetry(`${SEARCH_API}?${params}`, {
+    // Append languages manually to avoid URLSearchParams encoding | as %7C
+    const url = `${SEARCH_API}?${params}&languages=${lang}|en`;
+    const resp = await fetchWithRetry(url, {
       headers: { "User-Agent": USER_AGENT },
     });
     const data = await resp.json();
     for (const [id, entity] of Object.entries(data.entities || {})) {
       labelsMap[id] = {
-        name: entity.labels?.en?.value || id,
-        description: entity.descriptions?.en?.value || "",
+        name: entity.labels?.[lang]?.value || entity.labels?.en?.value || id,
+        nameEn: entity.labels?.en?.value || id,
+        description: entity.descriptions?.[lang]?.value || entity.descriptions?.en?.value || "",
       };
     }
   }
@@ -168,10 +170,10 @@ export async function fetchEntitiesByIds(ids) {
 }
 
 /**
- * Lookup a single entity by Wikidata ID (used for URL state restore).
+ * Lookup a single entity by Wikidata ID (used for URL state restore and adding from modal).
  */
-export async function fetchEntityById(id) {
-  const persons = await fetchEntitiesByIds([id]);
+export async function fetchEntityById(id, lang = "en") {
+  const persons = await fetchEntitiesByIds([id], lang);
   return persons[0] ?? null;
 }
 
@@ -219,25 +221,23 @@ LIMIT 50
   if (!ids.length) return [];
 
   // Step 2: fetch labels + descriptions + sitelinks for ranking
-  const languages = lang === "de" ? "de|en" : "en|de";
+  // languages appended manually to avoid URLSearchParams encoding | as %7C
   const params = new URLSearchParams({
     action: "wbgetentities",
     ids: ids.join("|"),
     props: "labels|descriptions|sitelinks",
-    languages,
     format: "json",
     origin: "*",
   });
-  const resp = await fetchWithRetry(`${SEARCH_API}?${params}`, { headers: { "User-Agent": USER_AGENT } });
+  const resp = await fetchWithRetry(`${SEARCH_API}?${params}&languages=${lang}|en`, { headers: { "User-Agent": USER_AGENT } });
   const data = await resp.json();
 
-  const fallback = lang === "de" ? "en" : "de";
   return Object.values(data.entities || {})
     .filter((e) => e.id && !e.missing && (e.labels?.en || e.labels?.de)) // filter non-humans (no label)
     .map((e) => ({
       id: e.id,
-      name: e.labels?.[lang]?.value || e.labels?.[fallback]?.value || e.id,
-      description: e.descriptions?.[lang]?.value || e.descriptions?.[fallback]?.value || "",
+      name: e.labels?.[lang]?.value || e.labels?.en?.value || e.id,
+      description: e.descriptions?.[lang]?.value || e.descriptions?.en?.value || "",
       sitelinks: e.sitelinks ? Object.keys(e.sitelinks).length : 0,
     }))
     .sort((a, b) => b.sitelinks - a.sitelinks)
