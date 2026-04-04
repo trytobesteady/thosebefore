@@ -194,7 +194,7 @@ function toSparqlDate(year, month = 1, day = 1) {
  *
  * Two-step: SPARQL for IDs (fast, no sitelinks join) + wbgetentities for ranking.
  */
-export async function fetchContemporaries(personId, centerYear, mode, range = 5, limit = 5) {
+export async function fetchContemporaries(personId, centerYear, mode, range = 5, limit = 5, lang = "en") {
   const property = mode === "births" ? "P569" : "P570";
   const fromYear = centerYear - range;
   const toYear = centerYear + range;
@@ -215,23 +215,25 @@ LIMIT 50
   if (!ids.length) return [];
 
   // Step 2: fetch labels + descriptions + sitelinks in one batch (max 50 → always 1 request)
+  const languages = lang === "de" ? "de|en" : "en|de";
   const params = new URLSearchParams({
     action: "wbgetentities",
     ids: ids.join("|"),
     props: "labels|descriptions|sitelinks",
-    languages: "en",
+    languages,
     format: "json",
     origin: "*",
   });
   const resp = await fetchWithRetry(`${SEARCH_API}?${params}`, { headers: { "User-Agent": USER_AGENT } });
   const data = await resp.json();
 
+  const fallback = lang === "de" ? "en" : "de";
   return Object.values(data.entities || {})
     .filter((e) => e.id && !e.missing)
     .map((e) => ({
       id: e.id,
-      name: e.labels?.en?.value || e.id,
-      description: e.descriptions?.en?.value || "",
+      name: e.labels?.[lang]?.value || e.labels?.[fallback]?.value || e.id,
+      description: e.descriptions?.[lang]?.value || e.descriptions?.[fallback]?.value || "",
       sitelinks: e.sitelinks ? Object.keys(e.sitelinks).length : 0,
     }))
     .sort((a, b) => b.sitelinks - a.sitelinks)
@@ -260,7 +262,8 @@ export async function fetchPersonImage(name) {
  * Fetch related persons for a given entity ID.
  * Returns array of { id, name, relType }
  */
-export async function fetchRelatedPersons(id) {
+export async function fetchRelatedPersons(id, lang = "en") {
+  const langPriority = lang === "de" ? "de,en" : "en,de";
   const query = `
 SELECT DISTINCT ?rel ?relLabel ?relDescription ?relType WHERE {
   VALUES ?person { wd:${id} }
@@ -281,7 +284,7 @@ SELECT DISTINCT ?rel ?relLabel ?relDescription ?relType WHERE {
   } UNION {
     ?person wdt:P737 ?rel . BIND("Influenced by" AS ?relType)
   }
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "de,en" }
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "${langPriority}" }
 }
 LIMIT 12
 `.trim();

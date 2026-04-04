@@ -125,7 +125,8 @@ function TooltipBox({ pos, onClose, children }) {
 }
 
 // Reusable chip button for adding a person to the timeline
-function PersonChip({ person, onAdd, existingIds, addingId, t }) {
+function PersonChip({ person, onAdd, existingIds, addingId }) {
+  const { t } = useLang();
   const already = existingIds?.has(person.id);
   const loading = addingId === person.id;
   return (
@@ -149,7 +150,7 @@ function PersonChip({ person, onAdd, existingIds, addingId, t }) {
 
 export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, existingIds }) {
   const [tooltipPos, setTooltipPos] = useState(null);
-  const { t } = useLang();
+  const { t, lang } = useLang();
 
   // Person image
   const [image, setImage] = useState(() => _imageCache.has(person.id) ? _imageCache.get(person.id) : undefined);
@@ -206,10 +207,11 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
 
   // Lazy-loaded on first section open
   function loadRelated() {
-    if (_relatedCache.has(person.id)) { setRelated(_relatedCache.get(person.id)); return; }
+    const key = `${person.id}:${lang}`;
+    if (_relatedCache.has(key)) { setRelated(_relatedCache.get(key)); return; }
     setRelatedLoading(true);
-    fetchRelatedPersons(person.id)
-      .then((d) => { _relatedCache.set(person.id, d); setRelated(d); })
+    fetchRelatedPersons(person.id, lang)
+      .then((d) => { _relatedCache.set(key, d); setRelated(d); })
       .catch(() => setRelated([]))
       .finally(() => setRelatedLoading(false));
   }
@@ -217,11 +219,11 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
   function searchContemporaries() {
     const centerYear = contempMode === "deaths" ? person.birthYear : person.deathYear;
     if (centerYear == null) return;
-    const key = `${person.id}:${contempMode}:${range}:${contempLimit}`;
+    const key = `${person.id}:${contempMode}:${range}:${contempLimit}:${lang}`;
     if (_contempCache.has(key)) { setContempResults(_contempCache.get(key)); return; }
     setContempLoading(true);
     setContempResults(null);
-    fetchContemporaries(person.id, centerYear, contempMode, range, contempLimit)
+    fetchContemporaries(person.id, centerYear, contempMode, range, contempLimit, lang)
       .then((d) => { _contempCache.set(key, d); setContempResults(d); })
       .catch(() => setContempResults([]))
       .finally(() => setContempLoading(false));
@@ -299,7 +301,7 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
           </div>
 
           {/* Related persons */}
-          <CollapsibleSection title={t.relationsInfluences} loading={relatedLoading} defaultOpen={false} onFirstOpen={loadRelated}>
+          <CollapsibleSection key={`rel-${lang}`} title={t.relationsInfluences} loading={relatedLoading} defaultOpen={false} onFirstOpen={loadRelated}>
             {groupedRelated && Object.keys(groupedRelated).length > 0 ? (
               <div className="space-y-1.5">
                 {Object.entries(groupedRelated).map(([type, persons]) => (
@@ -307,7 +309,7 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
                     <span className="text-xs text-base-content/40">{t.relType(type)}</span>
                     <div className="flex flex-wrap gap-1 mt-0.5">
                       {persons.map((r) => (
-                        <PersonChip key={r.id} person={r} onAdd={handleAdd} existingIds={existingIds} addingId={addingId} t={t} />
+                        <PersonChip key={r.id} person={r} onAdd={handleAdd} existingIds={existingIds} addingId={addingId} />
                       ))}
                     </div>
                   </div>
@@ -392,7 +394,7 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
                 <div className="flex flex-wrap gap-1">
                   {contempResults.length > 0
                     ? contempResults.map((r) => (
-                        <PersonChip key={r.id} person={r} onAdd={handleAdd} existingIds={existingIds} addingId={addingId} t={t} />
+                        <PersonChip key={r.id} person={r} onAdd={handleAdd} existingIds={existingIds} addingId={addingId} />
                       ))
                     : <span className="text-xs text-base-content/30">{t.noResults}</span>}
                 </div>
