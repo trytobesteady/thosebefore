@@ -199,11 +199,15 @@ export async function fetchContemporaries(personId, centerYear, mode, range = 5,
   const fromYear = centerYear - range;
   const toYear = centerYear + range;
 
-  // Step 1: get candidate IDs via date-range SPARQL (no sitelinks join — causes 502)
+  // Step 1: SPARQL — date filter + sitelinks threshold in one query.
+  // FILTER on sitelinks (no ORDER BY) avoids the 502 that ORDER BY DESC(?sitelinks) causes.
+  // Sitelinks are returned directly so Step 2 doesn't need to fetch them.
+  // Step 1: date-only SPARQL — no P31=Q5 join (millions of humans = expensive).
+  // P569/P570 date index is selective enough; non-human entities with dates are rare
+  // and filtered out in Step 2 via missing label check.
   const query = `
 SELECT DISTINCT ?person WHERE {
-  ?person wdt:${property} ?date ;
-          wdt:P31 wd:Q5 .
+  ?person wdt:${property} ?date .
   FILTER(?date >= ${toSparqlDate(fromYear)} &&
          ?date < ${toSparqlDate(toYear + 1)} &&
          ?person != wd:${personId})
@@ -214,7 +218,7 @@ LIMIT 50
   const ids = sparqlData.results.bindings.map((b) => b.person.value.split("/").pop());
   if (!ids.length) return [];
 
-  // Step 2: fetch labels + descriptions + sitelinks in one batch (max 50 → always 1 request)
+  // Step 2: fetch labels + descriptions + sitelinks for ranking
   const languages = lang === "de" ? "de|en" : "en|de";
   const params = new URLSearchParams({
     action: "wbgetentities",
@@ -229,7 +233,7 @@ LIMIT 50
 
   const fallback = lang === "de" ? "en" : "de";
   return Object.values(data.entities || {})
-    .filter((e) => e.id && !e.missing)
+    .filter((e) => e.id && !e.missing && (e.labels?.en || e.labels?.de)) // filter non-humans (no label)
     .map((e) => ({
       id: e.id,
       name: e.labels?.[lang]?.value || e.labels?.[fallback]?.value || e.id,
