@@ -1,13 +1,15 @@
 import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { getColorForId } from "../utils/colors";
-import { fetchRelatedPersons, fetchContemporaries, fetchEntityById, fetchPersonImage } from "../utils/sparql";
+import { fetchRelatedPersons, fetchContemporaries, fetchEntityById, fetchPersonImage, fetchOccupations, fetchSameField } from "../utils/sparql";
 import { useLang } from "../i18n";
 
 // Session-level caches — survive tooltip close/reopen and component remounts
 const _imageCache = new Map();
 const _relatedCache = new Map();
 const _contempCache = new Map();
+const _occupationsCache = new Map();
+const _sameFieldCache = new Map();
 
 function formatDate(date) {
   if (!date) return "?";
@@ -168,6 +170,14 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
   const MAX_RANGE = 10;
   const [contempLimit, setContempLimit] = useState(5);
 
+  // Same Field
+  const [occupations, setOccupations] = useState(null);
+  const [occupationsLoading, setOccupationsLoading] = useState(false);
+  const [selectedOccupationId, setSelectedOccupationId] = useState(null);
+  const [sameFieldResults, setSameFieldResults] = useState(null);
+  const [sameFieldLoading, setSameFieldLoading] = useState(false);
+  const [sameFieldLimit, setSameFieldLimit] = useState(5);
+
   const [addingId, setAddingId] = useState(null);
   const blockRef = useRef(null);
   const color = getColorForId(person.id);
@@ -228,6 +238,28 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
       .then((d) => { _contempCache.set(key, d); setContempResults(d); })
       .catch(() => setContempResults([]))
       .finally(() => setContempLoading(false));
+  }
+
+  function loadOccupations() {
+    const key = `${person.id}:${lang}`;
+    if (_occupationsCache.has(key)) { setOccupations(_occupationsCache.get(key)); return; }
+    setOccupationsLoading(true);
+    fetchOccupations(person.id, lang)
+      .then((d) => { _occupationsCache.set(key, d); setOccupations(d); })
+      .catch(() => setOccupations([]))
+      .finally(() => setOccupationsLoading(false));
+  }
+
+  function handleOccupationClick(occId) {
+    setSelectedOccupationId(occId);
+    const key = `${person.id}:${occId}:${sameFieldLimit}:${lang}`;
+    if (_sameFieldCache.has(key)) { setSameFieldResults(_sameFieldCache.get(key)); return; }
+    setSameFieldLoading(true);
+    setSameFieldResults(null);
+    fetchSameField(person.id, occId, person.birthYear, lang, sameFieldLimit)
+      .then((d) => { _sameFieldCache.set(key, d); setSameFieldResults(d); })
+      .catch(() => setSameFieldResults([]))
+      .finally(() => setSameFieldLoading(false));
   }
 
   async function handleAdd(relPerson) {
@@ -400,6 +432,56 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
                     : <span className="text-xs text-base-content/30">{t.noResults}</span>}
                 </div>
               )}
+            </div>
+          </CollapsibleSection>
+
+          {/* Same Field */}
+          <CollapsibleSection key={`field-${lang}`} title={t.sameField} loading={occupationsLoading || sameFieldLoading} defaultOpen={false} onFirstOpen={loadOccupations}>
+            <div className="space-y-2 pt-0.5" onClick={(e) => e.stopPropagation()}>
+              {occupations && occupations.length > 0 ? (
+                <>
+                  <div className="flex flex-wrap gap-1">
+                    {occupations.map((occ) => (
+                      <button
+                        key={occ.id}
+                        className={`text-xs rounded px-1.5 py-0.5 transition-colors ${
+                          selectedOccupationId === occ.id
+                            ? "bg-primary text-white"
+                            : "bg-base-200 text-base-content/70 hover:bg-base-300"
+                        }`}
+                        onClick={() => handleOccupationClick(occ.id)}
+                      >
+                        {occ.name}
+                      </button>
+                    ))}
+                  </div>
+                  {selectedOccupationId && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-base-content/40">{t.top}</span>
+                      <input
+                        type="number"
+                        className="input input-xs input-ghost w-8 text-center px-0 h-5 min-h-0"
+                        value={sameFieldLimit} min={1} max={10}
+                        onChange={(e) => setSameFieldLimit(Math.max(1, Math.min(10, parseInt(e.target.value) || 5)))}
+                      />
+                    </div>
+                  )}
+                  {!selectedOccupationId && (
+                    <p className="text-xs text-base-content/30 italic">{t.selectOccupation}</p>
+                  )}
+                  {sameFieldResults != null && !sameFieldLoading && (
+                    <div className="flex flex-wrap gap-1">
+                      {sameFieldResults.length > 0
+                        ? sameFieldResults.map((r) => (
+                            <PersonChip key={r.id} person={r} onAdd={handleAdd} existingIds={existingIds} addingId={addingId} />
+                          ))
+                        : <span className="text-xs text-base-content/30">{t.noResults}</span>}
+                    </div>
+                  )}
+                </>
+              ) : !occupationsLoading ? (
+                <span className="text-xs text-base-content/30">{t.noOccupations}</span>
+              ) : null}
             </div>
           </CollapsibleSection>
 

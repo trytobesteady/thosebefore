@@ -52,6 +52,9 @@ const translations = {
     peopleBorn: (from, to) => `People born between ${from} – ${to}`,
     stillAlive: "still alive",
     relType: (type) => type,
+    sameField: "Same Field",
+    noOccupations: "No occupations in Wikidata",
+    selectOccupation: "Select an occupation above",
   },
   de: {
     appTitle: "Biografische Zeitleiste",
@@ -103,6 +106,9 @@ const translations = {
     peopleDied: (from, to) => `Personen, die zwischen ${from} und ${to} gestorben sind`,
     peopleBorn: (from, to) => `Personen, die zwischen ${from} und ${to} geboren wurden`,
     stillAlive: "noch lebend",
+    sameField: "Selbes Fachgebiet",
+    noOccupations: "Keine Berufe in Wikidata",
+    selectOccupation: "Beruf oben auswählen",
     relType: (type) => ({
       "Spouse": "Ehepartner",
       "Child": "Kind",

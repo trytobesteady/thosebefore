@@ -263,6 +263,72 @@ export async function fetchPersonImage(name) {
 }
 
 /**
+ * Fetch occupations (P106) for a person with labels in the given language.
+ * Returns array of { id, name }
+ */
+export async function fetchOccupations(personId, lang = "en") {
+  const langPriority = lang === "de" ? "de,en" : "en,de";
+  const query = `
+SELECT DISTINCT ?occ ?occLabel WHERE {
+  wd:${personId} wdt:P106 ?occ .
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "${langPriority}" }
+}
+`.trim();
+  const data = await runSparqlQuery(query);
+  return data.results.bindings.map((b) => ({
+    id: b.occ.value.split("/").pop(),
+    name: b.occLabel?.value || b.occ.value.split("/").pop(),
+  }));
+}
+
+/**
+ * Fetch most notable persons sharing an occupation, filtered by birth year ±50 years.
+ * Returns array of { id, name, nameEn, description, sitelinks }
+ */
+export async function fetchSameField(personId, occupationId, birthYear, lang = "en", limit = 5) {
+  const dateFilter = birthYear != null
+    ? `?person wdt:P569 ?birth .
+  FILTER(?birth >= ${toSparqlDate(birthYear - 50)} &&
+         ?birth < ${toSparqlDate(birthYear + 51)})`
+    : "";
+  const query = `
+SELECT DISTINCT ?person WHERE {
+  ?person wdt:P106 wd:${occupationId} .
+  ${dateFilter}
+  FILTER(?person != wd:${personId})
+}
+LIMIT 50
+`.trim();
+  const sparqlData = await runSparqlQuery(query);
+  const ids = sparqlData.results.bindings.map((b) => b.person.value.split("/").pop());
+  if (!ids.length) return [];
+
+  const params = new URLSearchParams({
+    action: "wbgetentities",
+    ids: ids.join("|"),
+    props: "labels|descriptions|sitelinks",
+    format: "json",
+    origin: "*",
+  });
+  const resp = await fetchWithRetry(`${SEARCH_API}?${params}&languages=${lang}|en`, {
+    headers: { "User-Agent": USER_AGENT },
+  });
+  const data = await resp.json();
+
+  return Object.values(data.entities || {})
+    .filter((e) => e.id && !e.missing && (e.labels?.en || e.labels?.[lang]))
+    .map((e) => ({
+      id: e.id,
+      name: e.labels?.[lang]?.value || e.labels?.en?.value || e.id,
+      nameEn: e.labels?.en?.value || e.id,
+      description: e.descriptions?.[lang]?.value || e.descriptions?.en?.value || "",
+      sitelinks: e.sitelinks ? Object.keys(e.sitelinks).length : 0,
+    }))
+    .sort((a, b) => b.sitelinks - a.sitelinks)
+    .slice(0, limit);
+}
+
+/**
  * Fetch related persons for a given entity ID.
  * Returns array of { id, name, relType }
  */
