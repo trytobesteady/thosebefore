@@ -399,6 +399,24 @@ function parseDateValue(value) {
   }
 }
 
+export async function fetchQidFromWikipedia(articleTitle) {
+  const params = new URLSearchParams({
+    action: "query",
+    titles: articleTitle,
+    prop: "pageprops",
+    ppprop: "wikibase_item",
+    format: "json",
+    origin: "*",
+  });
+  const resp = await fetchWithRetry(`https://en.wikipedia.org/w/api.php?${params}`, {
+    headers: { "User-Agent": USER_AGENT },
+  });
+  const data = await resp.json();
+  const pages = data?.query?.pages;
+  if (!pages) return null;
+  return Object.values(pages)[0]?.pageprops?.wikibase_item ?? null;
+}
+
 // Keep for backward compatibility (used in useTimeline.js URL restore)
 export { fetchEntityById as buildEntityQuery };
 export function parsePersonResults() { return []; } // unused now

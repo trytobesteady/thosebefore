@@ -5,10 +5,23 @@ import { useTimeline } from "./hooks/useTimeline";
 import { encodeState } from "./utils/urlState";
 import { useLang } from "./i18n";
 
+function readThemeCookie() {
+  const match = document.cookie.match(/(?:^|;\s*)theme=([^;]+)/);
+  const val = match?.[1];
+  return val === "dark" ? "dark" : "light";
+}
+
 export default function App() {
   const { persons, sortMode, sortDir, loadingState, addPerson, removePerson, reorder, sortByBirth, sortByDeath, toggleSortDir } = useTimeline();
   const [copied, setCopied] = useState(false);
   const { t, lang, setLang } = useLang();
+  const [theme, setThemeState] = useState(readThemeCookie);
+
+  function toggleTheme() {
+    const next = theme === "light" ? "dark" : "light";
+    document.cookie = `theme=${next};path=/;max-age=31536000`;
+    setThemeState(next);
+  }
 
   const existingIds = useMemo(() => new Set(persons.map((p) => p.id)), [persons]);
 
@@ -32,7 +45,7 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-base-100" data-theme="light">
+    <div className="h-screen flex flex-col bg-base-100" data-theme={theme}>
       {/* Header */}
       <header className="border-b border-base-200 bg-base-100 shrink-0">
         {/* Row 1: title left, lang switch + share right */}
@@ -41,6 +54,22 @@ export default function App() {
             <span className="font-bold text-lg tracking-tight text-base-content">{t.appTitle}</span>
           </div>
           <div className="flex items-center gap-2">
+            {/* Dark mode toggle */}
+            <button
+              className="btn btn-xs btn-ghost border border-base-300"
+              onClick={toggleTheme}
+              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {theme === "dark" ? (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 5a7 7 0 000 14A7 7 0 0012 5z" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+              )}
+            </button>
             {/* Language toggle */}
             <div className="join">
               <button
