@@ -57,8 +57,19 @@ export default function TimelineCanvas({
   const scrollRef = useRef(null);
   const dragIndexRef = useRef(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(() => {
+    const saved = parseFloat(localStorage.getItem('timeline-zoom'));
+    return isNaN(saved) ? 1 : Math.min(10, Math.max(0.2, saved));
+  });
   const { t } = useLang();
+
+  function updateZoom(fn) {
+    setZoom(z => {
+      const next = typeof fn === 'function' ? fn(z) : fn;
+      localStorage.setItem('timeline-zoom', next);
+      return next;
+    });
+  }
 
   const { startYear, endYear, totalYears } = computeTimeRange(persons);
   const baseWidth = 900;
@@ -122,10 +133,10 @@ export default function TimelineCanvas({
 
         <div className="ml-auto flex items-center gap-2">
           <span className="text-xs text-base-content/50">{t.zoom}</span>
-          <button className="btn btn-xs btn-ghost" onClick={() => setZoom((z) => Math.max(0.2, z - 0.2))}>−</button>
+          <button className="btn btn-xs btn-ghost" onClick={() => updateZoom(z => Math.max(0.2, z - 0.2))}>−</button>
           <span className="text-xs w-10 text-center">{Math.round(zoom * 100)}%</span>
-          <button className="btn btn-xs btn-ghost" onClick={() => setZoom((z) => Math.min(10, z + 0.2))}>+</button>
-          <button className="btn btn-xs btn-ghost" onClick={() => setZoom(1)}>{t.zoomReset}</button>
+          <button className="btn btn-xs btn-ghost" onClick={() => updateZoom(z => Math.min(10, z + 0.2))}>+</button>
+          <button className="btn btn-xs btn-ghost" onClick={() => updateZoom(1)}>{t.zoomReset}</button>
         </div>
       </div>
 

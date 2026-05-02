@@ -32,6 +32,7 @@ const translations = {
     zoomReset: "Reset",
     emptyHint: "Search for people and add them to the timeline",
     bce: (y) => `${y} BC`,
+    ce: (y) => `${y} CE`,
 
     dragToReorder: "Drag to reorder",
     present: "present",
@@ -46,6 +47,7 @@ const translations = {
     birthLabel: "Birth",
     deathLabel: "Death",
     years: "Years",
+    range: "Range",
     top: "Top",
     search: "Search",
     peopleDied: (from, to) => `People who died between ${from} – ${to}`,
@@ -87,6 +89,7 @@ const translations = {
     zoomReset: "Zurücksetzen",
     emptyHint: "Personen suchen und zur Zeitleiste hinzufügen",
     bce: (y) => `${y} v. Chr.`,
+    ce: (y) => `${y} n. Chr.`,
 
     dragToReorder: "Ziehen zum Neuanordnen",
     present: "heute",
@@ -101,6 +104,7 @@ const translations = {
     birthLabel: "Geburt",
     deathLabel: "Tod",
     years: "Jahre",
+    range: "Bereich",
     top: "Top",
     search: "Suchen",
     peopleDied: (from, to) => `Personen, die zwischen ${from} und ${to} gestorben sind`,

@@ -399,10 +399,10 @@ function parseDateValue(value) {
   }
 }
 
-export async function fetchQidFromWikipedia(articleTitle) {
+export async function fetchQidFromWikipediaPageId(pageId) {
   const params = new URLSearchParams({
     action: "query",
-    titles: articleTitle,
+    pageids: String(pageId),
     prop: "pageprops",
     ppprop: "wikibase_item",
     format: "json",

@@ -8,11 +8,11 @@ An interactive biographical timeline powered by [Wikidata](https://www.wikidata.
 
 Search for historical persons and place them on a shared timeline. For each person you can open a detail modal and explore:
 
-- **Relations & Influences** — family members, teachers, students, and intellectual influences
-- **Contemporaries** — notable people who were born or died around the same time (configurable year range and result count)
+- **Contemporaries** — notable people born around the same time, anchored on either this person's birth or death year (configurable ± year range, up to ±20 years). Results come from a local [Pantheon](https://pantheon.world/) dataset, ranked by Historical Popularity Index. Years are displayed with era suffixes (BC/CE, v./n. Chr.). Clicking a name adds them to the timeline.
 - **Same Field** — prominent people sharing an occupation, filtered by birth year ± 50 years
+- **Relations & Influences** — family members, teachers, students, and intellectual influences
 
-Timelines are shareable via URL. The UI language can be switched between English and German (persisted via cookie); Wikidata labels and descriptions switch accordingly.
+Timelines are shareable via URL. The UI language can be switched between English and German (persisted via cookie); Wikidata labels and descriptions switch accordingly. Dark mode is available and also persisted via cookie.
 
 ## Tech stack
 
@@ -28,10 +28,10 @@ Timelines are shareable via URL. The UI language can be switched between English
 
 - Add/remove persons; sort by birth year, death year, or drag-and-drop manual order
 - Ascending/descending sort toggle
-- Zoom control for the timeline axis
-- Person modal: thumbnail, Wikipedia link, three expandable sections (Relations & Influences, Contemporaries, Same Field)
+- Zoom control for the timeline axis (persisted via localStorage)
+- Person modal: thumbnail, Wikipedia link, three expandable sections (Contemporaries, Same Field, Relations & Influences)
 - Shareable URLs (`?p=Q762,Q5592,…`) encoding the full current selection
-- DE/EN language switch
+- DE/EN language switch, dark mode toggle
 
 ## Development
 
@@ -42,10 +42,23 @@ npm run build     # production build
 npm run preview   # preview production build locally
 ```
 
+## Pantheon dataset
+
+Contemporaries are served from `public/pantheon.csv`, a local copy of the [Pantheon](https://pantheon.world/) dataset (MIT Media Lab, CC BY 4.0). The file ships with the base columns from Kaggle. To enrich it with pre-resolved Wikidata QIDs and German names (recommended — eliminates a per-click API lookup and enables DE-language chip labels), run:
+
+```bash
+node enrich.mjs
+```
+
+This takes ~3–5 minutes and rewrites `pantheon.csv` in place, adding two columns: `wikidata_id` and `name_de`. The app works without running it; enrichment is purely optional.
+
+To update to a newer Pantheon release, replace `public/pantheon.csv` with a file that has the same column structure, then re-run `enrich.mjs`.
+
 ## Deployment
 
 GitHub Actions builds and deploys to `bennybaum.de/thosebefore/` via FTP on every push to `master`. See [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
 
 ## Data
 
-All biographical data is sourced from [Wikidata](https://www.wikidata.org/) under the [CC0 1.0 license](https://creativecommons.org/publicdomain/zero/1.0/).
+Biographical data: [Wikidata](https://www.wikidata.org/) (CC0 1.0).  
+Contemporaries dataset: [Pantheon](https://pantheon.world/) by MIT Media Lab (CC BY 4.0).

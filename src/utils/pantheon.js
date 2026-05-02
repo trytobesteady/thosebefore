@@ -35,15 +35,16 @@ export async function loadPantheon() {
       const data = [];
       for (let i = 1; i < lines.length; i++) {
         const cols = parseCSVLine(lines[i].trim());
-        const birthyear = parseInt(cols[11], 10);
-        const hpi = parseFloat(cols[22]);
+        const birthyear = parseInt(cols[3], 10);
+        const hpi = parseFloat(cols[16]);
         if (isNaN(birthyear) || isNaN(hpi)) continue;
         data.push({
-          en_curid: cols[0],
+          pageId: cols[0],
           name: cols[1],
+          nameDe: cols[18] || '',
+          wikidataId: cols[17] || '',
           birthyear,
           hpi,
-          wikipediaName: cols[24] || cols[1],
         });
       }
       _data = data;
@@ -54,7 +55,7 @@ export async function loadPantheon() {
   return _promise;
 }
 
-export async function getPantheonContemporaries(birthYear, range, excludeName) {
+export async function getPantheonContemporaries(birthYear, range, excludeName, lang = 'en') {
   const data = await loadPantheon();
   const from = birthYear - range;
   const to = birthYear + range;
@@ -62,8 +63,9 @@ export async function getPantheonContemporaries(birthYear, range, excludeName) {
     .filter(p => p.birthyear >= from && p.birthyear <= to && p.name !== excludeName)
     .sort((a, b) => b.hpi - a.hpi)
     .map(p => ({
-      id: `pantheon:${p.en_curid}`,
-      name: p.name,
-      wikipediaName: p.wikipediaName,
+      id: `pantheon:${p.pageId}`,
+      name: (lang === 'de' && p.nameDe) ? p.nameDe : p.name,
+      pageId: p.pageId,
+      wikidataId: p.wikidataId,
     }));
 }

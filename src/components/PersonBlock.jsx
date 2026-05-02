@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { createPortal } from "react-dom";
 import { getColorForId } from "../utils/colors";
-import { fetchRelatedPersons, fetchEntityById, fetchPersonImage, fetchOccupations, fetchSameField, fetchQidFromWikipedia } from "../utils/sparql";
+import { fetchRelatedPersons, fetchEntityById, fetchPersonImage, fetchOccupations, fetchSameField, fetchQidFromWikipediaPageId } from "../utils/sparql";
 import { getPantheonContemporaries } from "../utils/pantheon";
 import { useLang } from "../i18n";
 
@@ -26,6 +26,10 @@ function formatDate(date) {
   return year < 0
     ? `${d}.${m}.${Math.abs(year)} BC`
     : `${d}.${m}.${year}`;
+}
+
+function formatYear(year, t) {
+  return year < 0 ? t.bce(Math.abs(year)) : t.ce(year);
 }
 
 function groupBy(arr, key) {
@@ -214,6 +218,9 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
     }
   }
 
+  // Close tooltip on language change to avoid stale translated content
+  useEffect(() => { setTooltipPos(null); }, [lang]);
+
   // Fetch image on mount (cached across remounts)
   useEffect(() => {
     if (imageFetchedRef.current === person.id) return;
@@ -238,12 +245,12 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
   async function searchContemporaries() {
     const centerYear = contempAnchor === "birth" ? person.birthYear : person.deathYear;
     if (centerYear == null) return;
-    const key = `${person.id}:${contempAnchor}:${range}`;
+    const key = `${person.id}:${contempAnchor}:${range}:${lang}`;
     if (_contempCache.has(key)) { setContempResults(_contempCache.get(key)); return; }
     setContempLoading(true);
     setContempResults(null);
     try {
-      const results = await getPantheonContemporaries(centerYear, range, person.name);
+      const results = await getPantheonContemporaries(centerYear, range, person.name, lang);
       _contempCache.set(key, results);
       setContempResults(results);
     } catch {
@@ -281,7 +288,7 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
     try {
       let entityId = relPerson.id;
       if (relPerson.id.startsWith('pantheon:')) {
-        entityId = await fetchQidFromWikipedia(relPerson.wikipediaName);
+        entityId = relPerson.wikidataId || await fetchQidFromWikipediaPageId(relPerson.pageId);
         if (!entityId) return;
         _pantheonQidCache.set(relPerson.id, entityId);
         sessionStorage.setItem('_pqc', JSON.stringify([..._pantheonQidCache]));
@@ -368,24 +375,26 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
                         onClick={() => setContempAnchor("birth")}
                         disabled={person.birthYear == null}
                       >
-                        {t.birthLabel}{person.birthYear != null ? ` (${person.birthYear})` : ""}
+                        {t.birthLabel}{person.birthYear != null ? ` (${formatYear(person.birthYear, t)})` : ""}
                       </button>
                       <button
                         className={`join-item btn btn-xs h-5 min-h-0 px-2 ${contempAnchor === "death" ? "btn-primary" : "btn-ghost border border-base-300"}`}
                         onClick={() => setContempAnchor("death")}
                         disabled={person.deathYear == null}
                       >
-                        {t.deathLabel}{person.deathYear != null ? ` (${person.deathYear})` : ""}
+                        {t.deathLabel}{person.deathYear != null ? ` (${formatYear(person.deathYear, t)})` : ""}
                       </button>
                     </div>
-                    <span className="text-xs text-base-content/40">±</span>
-                    <input
-                      type="number"
-                      className="input input-xs input-ghost w-10 text-center px-0.5 h-5 min-h-0"
-                      value={range} min={1} max={MAX_RANGE}
-                      onChange={(e) => setRange(Math.max(1, Math.min(MAX_RANGE, parseInt(e.target.value) || 5)))}
-                    />
-                    <span className="text-xs text-base-content/40">{t.years}</span>
+                    <div className="flex items-center gap-1.5 whitespace-nowrap ml-1 mt-1">
+                      <span className="text-xs text-base-content/40">{t.range} ±</span>
+                      <input
+                        type="number"
+                        className="input input-xs input-ghost w-10 text-center px-0.5 h-5 min-h-0"
+                        value={range} min={1} max={MAX_RANGE}
+                        onChange={(e) => setRange(Math.max(1, Math.min(MAX_RANGE, parseInt(e.target.value) || 5)))}
+                      />
+                      <span className="text-xs text-base-content/40">{t.years}</span>
+                    </div>
                   </div>
                   {(() => {
                     const centerYear = contempAnchor === "birth" ? person.birthYear : person.deathYear;
