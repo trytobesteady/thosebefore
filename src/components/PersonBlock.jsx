@@ -181,6 +181,7 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
   const [contempAnchor, setContempAnchor] = useState(person.deathYear != null ? "death" : "birth");
   const [range, setRange] = useState(10);
   const MAX_RANGE = 20;
+  const contempMountedRef = useRef(false);
 
   // Same Field
   const [occupations, setOccupations] = useState(null);
@@ -220,6 +221,13 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
 
   // Close tooltip on language change to avoid stale translated content
   useEffect(() => { setTooltipPos(null); }, [lang]);
+
+  // Re-search when anchor or range changes; skip first run (onFirstOpen handles initial search)
+  useEffect(() => {
+    if (!contempMountedRef.current) { contempMountedRef.current = true; return; }
+    const timer = setTimeout(searchContemporaries, 300);
+    return () => clearTimeout(timer);
+  }, [contempAnchor, range]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch image on mount (cached across remounts)
   useEffect(() => {
@@ -394,6 +402,7 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
                         onChange={(e) => setRange(Math.max(1, Math.min(MAX_RANGE, parseInt(e.target.value) || 5)))}
                       />
                       <span className="text-xs text-base-content/40">{t.years}</span>
+                      {contempLoading && <span className="loading loading-spinner loading-xs ml-1" />}
                     </div>
                   </div>
                   {(() => {
@@ -405,13 +414,6 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
                       </p>
                     );
                   })()}
-                  <button
-                    className="btn btn-sm btn-primary w-full"
-                    onClick={searchContemporaries}
-                    disabled={contempLoading || (contempAnchor === "birth" ? person.birthYear == null : person.deathYear == null)}
-                  >
-                    {contempLoading ? <span className="loading loading-spinner loading-xs" /> : t.search}
-                  </button>
                   {contempResults != null && !contempLoading && (
                     <div className="flex flex-wrap gap-1">
                       {contempResults.length > 0

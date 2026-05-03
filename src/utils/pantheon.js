@@ -43,6 +43,8 @@ export async function loadPantheon() {
           name: cols[1],
           nameDe: cols[18] || '',
           wikidataId: cols[17] || '',
+          descriptionEn: cols[19] || '',
+          descriptionDe: cols[20] || '',
           birthyear,
           hpi,
         });
@@ -65,6 +67,7 @@ export async function getPantheonContemporaries(birthYear, range, excludeName, l
     .map(p => ({
       id: `pantheon:${p.pageId}`,
       name: (lang === 'de' && p.nameDe) ? p.nameDe : p.name,
+      description: (lang === 'de' && p.descriptionDe) ? p.descriptionDe : p.descriptionEn,
       pageId: p.pageId,
       wikidataId: p.wikidataId,
     }));
