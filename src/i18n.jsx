@@ -57,6 +57,15 @@ const translations = {
     sameField: "Same Field",
     noOccupations: "No occupations in Wikidata",
     selectOccupation: "Select an occupation above",
+
+    publishTitle: "Publish Timeline",
+    publish: "Publish",
+    publishPlaceholder: "Title (optional)",
+    copyLink: "Copy",
+    publishError: "Something went wrong. Please try again.",
+    recentTimelines: "Recent Timelines",
+    noRecentTimelines: "No timelines published yet.",
+    publishMinPersons: "Add at least 2 persons to publish.",
   },
   de: {
     appTitle: "Biografische Zeitleiste",
@@ -113,6 +122,15 @@ const translations = {
     sameField: "Selbes Fachgebiet",
     noOccupations: "Keine Berufe in Wikidata",
     selectOccupation: "Beruf oben auswählen",
+
+    publishTitle: "Zeitleiste veröffentlichen",
+    publish: "Veröffentlichen",
+    publishPlaceholder: "Titel (optional)",
+    copyLink: "Kopieren",
+    publishError: "Etwas ist schiefgelaufen. Bitte erneut versuchen.",
+    recentTimelines: "Zuletzt veröffentlicht",
+    noRecentTimelines: "Noch keine Zeitleisten veröffentlicht.",
+    publishMinPersons: "Füge mindestens 2 Personen hinzu.",
     relType: (type) => ({
       "Spouse": "Ehepartner",
       "Child": "Kind",

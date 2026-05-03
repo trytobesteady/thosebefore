@@ -12,13 +12,14 @@ Search for historical persons and place them on a shared timeline. For each pers
 - **Same Field** — prominent people sharing an occupation, filtered by birth year ± 50 years
 - **Relations & Influences** — family members, teachers, students, and intellectual influences
 
-Timelines are shareable via URL. The UI language can be switched between English and German (persisted via cookie); Wikidata labels and descriptions switch accordingly. Dark mode is available and also persisted via cookie.
+Timelines are shareable via URL or published to a public feed. The UI language can be switched between English and German (persisted via cookie); Wikidata labels and descriptions switch accordingly. Dark mode is available and also persisted via cookie.
 
 ## Tech stack
 
 - **React 19** + **Vite 8** — no server-side rendering, fully client-side
 - **Tailwind CSS v3** + **daisyUI v4**
-- **No backend** — all data fetched at runtime from public Wikidata APIs:
+- **Cloudflare Worker + KV** — serverless backend for the publish/share feature (`worker/index.js`, deployed via Wrangler)
+- All biographical data fetched at runtime from public Wikidata APIs:
   - [Wikidata SPARQL endpoint](https://query.wikidata.org/) for structured queries
   - [wbsearchentities](https://www.wikidata.org/w/api.php) for fast text search
   - [wbgetentities](https://www.wikidata.org/w/api.php) for labels, descriptions, and sitelink-based ranking
@@ -31,6 +32,8 @@ Timelines are shareable via URL. The UI language can be switched between English
 - Zoom control for the timeline axis (persisted via localStorage)
 - Person modal: thumbnail, Wikipedia link, three expandable sections (Contemporaries, Same Field, Relations & Influences)
 - Shareable URLs (`?p=Q762,Q5592,…`) encoding the full current selection
+- **Publish** — saves a timeline to a Cloudflare Worker with a short share URL (`?share=abc123`); auto-titles from first and last person if no title is given (requires ≥ 2 persons)
+- **Recent Timelines** — public feed of the last 20 published timelines, accessible via the Publish modal
 - DE/EN language switch, dark mode toggle
 
 ## Development
@@ -50,7 +53,7 @@ Contemporaries are served from `public/pantheon.csv`, a local copy of the [Panth
 node enrich.mjs
 ```
 
-This takes ~3–5 minutes and rewrites `pantheon.csv` in place, adding two columns: `wikidata_id` and `name_de`. The app works without running it; enrichment is purely optional.
+This takes ~3–5 minutes and rewrites `pantheon.csv` in place, adding four columns: `wikidata_id`, `name_de`, `description_en`, `description_de`. The descriptions power the hover tooltips on Contemporaries chips. The app works without running it; enrichment is purely optional.
 
 To update to a newer Pantheon release, replace `public/pantheon.csv` with a file that has the same column structure, then re-run `enrich.mjs`.
 

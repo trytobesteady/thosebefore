@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect } from "react";
 import SearchBar from "./components/SearchBar";
 import TimelineCanvas from "./components/TimelineCanvas";
+import PublishModal from "./components/PublishModal";
 import { useTimeline } from "./hooks/useTimeline";
 import { encodeState } from "./utils/urlState";
 import { useLang } from "./i18n";
@@ -14,6 +15,7 @@ function readThemeCookie() {
 export default function App() {
   const { persons, sortMode, sortDir, loadingState, addPerson, removePerson, reorder, sortByBirth, sortByDeath, toggleSortDir } = useTimeline();
   const [copied, setCopied] = useState(false);
+  const [showPublish, setShowPublish] = useState(false);
   const { t, lang, setLang } = useLang();
   const [theme, setThemeState] = useState(readThemeCookie);
 
@@ -86,6 +88,17 @@ export default function App() {
               </button>
             </div>
             <button
+              className="btn btn-sm btn-outline"
+              onClick={() => setShowPublish(true)}
+              disabled={persons.length < 2}
+              title={t.publishTitle}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 16v2a2 2 0 002 2h14a2 2 0 002-2v-2M12 3v12m0-12l-4 4m4-4l4 4" />
+              </svg>
+              {t.publish}
+            </button>
+            <button
               className={`btn btn-sm ${copied ? "btn-success" : "btn-outline"}`}
               onClick={handleShare}
               disabled={persons.length === 0}
@@ -146,6 +159,10 @@ export default function App() {
           <span>{t.personCount(persons.length)}</span>
           <span>{t.dataCredit}</span>
         </footer>
+      )}
+
+      {showPublish && (
+        <PublishModal persons={persons} onClose={() => setShowPublish(false)} />
       )}
     </div>
   );

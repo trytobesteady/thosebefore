@@ -1,6 +1,7 @@
 import { useReducer, useEffect, useState } from "react";
 import { decodeState } from "../utils/urlState";
 import { fetchEntitiesByIds } from "../utils/sparql";
+import { fetchSharedTimeline } from "../utils/worker";
 import { useLang } from "../i18n";
 
 function reducer(state, action) {
@@ -48,12 +49,35 @@ export function useTimeline() {
   const { lang } = useLang();
   const [state, dispatch] = useReducer(reducer, { persons: [], sortMode: "manual", sortDir: "asc" });
   const [loadingState, setLoadingState] = useState(() => {
-    const ids = decodeState(window.location.search);
-    return ids.length > 0 ? true : null;
+    const params = new URLSearchParams(window.location.search);
+    const shareId = params.get('share');
+    const ids = !shareId ? decodeState(window.location.search) : [];
+    return shareId || ids.length > 0 ? true : null;
   });
 
-  // Load persons from URL on mount
+  // Load persons from URL on mount — handles both ?share=id and ?p=Q1,Q2,...
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const shareId = params.get('share');
+
+    if (shareId) {
+      let cancelled = false;
+      setLoadingState(true);
+      (async () => {
+        try {
+          const timeline = await fetchSharedTimeline(shareId);
+          if (cancelled) return;
+          const ids = (timeline?.persons ?? []).map(p => p.id).filter(id => /^Q\d+$/.test(id));
+          if (ids.length > 0) {
+            const persons = await fetchEntitiesByIds(ids, lang);
+            if (!cancelled && persons.length > 0) dispatch({ type: "SET_PERSONS", persons });
+          }
+        } catch { /* skip */ }
+        if (!cancelled) setLoadingState(null);
+      })();
+      return () => { cancelled = true; };
+    }
+
     const ids = decodeState(window.location.search);
     if (!ids.length) return;
 
@@ -65,9 +89,7 @@ export function useTimeline() {
         const persons = await fetchEntitiesByIds(ids, lang);
         if (cancelled) return;
         if (persons.length > 0) dispatch({ type: "SET_PERSONS", persons });
-      } catch {
-        // skip failed lookups
-      }
+      } catch { /* skip */ }
       if (!cancelled) setLoadingState(null);
     })();
 

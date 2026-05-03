@@ -1,0 +1,7 @@
+name = "thosebefore-worker"
+main = "worker/index.js"
+compatibility_date = "2025-01-01"
+
+[[kv_namespaces]]
+binding = "TIMELINES"
+id = "273a9660fdf94a578a787f5056684677"
