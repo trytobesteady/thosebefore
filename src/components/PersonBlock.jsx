@@ -180,6 +180,8 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
   const [contempLoading, setContempLoading] = useState(false);
   const [contempAnchor, setContempAnchor] = useState(person.deathYear != null ? "death" : "birth");
   const [range, setRange] = useState(10);
+  const [contempLimit, setContempLimit] = useState(8);
+  const CONTEMP_STEP = 8;
   const MAX_RANGE = 20;
   const contempMountedRef = useRef(false);
 
@@ -225,6 +227,7 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
   // Re-search when anchor or range changes; skip first run (onFirstOpen handles initial search)
   useEffect(() => {
     if (!contempMountedRef.current) { contempMountedRef.current = true; return; }
+    setContempLimit(8);
     const timer = setTimeout(searchContemporaries, 300);
     return () => clearTimeout(timer);
   }, [contempAnchor, range]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -416,11 +419,23 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
                   })()}
                   {contempResults != null && !contempLoading && (
                     <div className="flex flex-wrap gap-1">
-                      {contempResults.length > 0
-                        ? contempResults.map((r) => (
+                      {contempResults.length > 0 ? (
+                        <>
+                          {contempResults.slice(0, contempLimit).map((r) => (
                             <PersonChip key={r.id} person={r} onAdd={handleAdd} existingIds={existingIds} addingId={addingId} />
-                          ))
-                        : <span className="text-xs text-base-content/30">{t.noResults}</span>}
+                          ))}
+                          {contempResults.length > contempLimit && (
+                            <button
+                              className="text-xs rounded px-1.5 py-0.5 bg-base-200 text-base-content/40 hover:bg-base-300 hover:text-base-content/70 transition-colors"
+                              onClick={(e) => { e.stopPropagation(); setContempLimit(l => l + CONTEMP_STEP); }}
+                            >
+                              +{Math.min(CONTEMP_STEP, contempResults.length - contempLimit)} more
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-xs text-base-content/30">{t.noResults}</span>
+                      )}
                     </div>
                   )}
                 </>

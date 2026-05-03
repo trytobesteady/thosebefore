@@ -47,6 +47,7 @@ export async function loadPantheon() {
           descriptionDe: cols[20] || '',
           birthyear,
           hpi,
+          articleLanguages: parseInt(cols[13], 10) || 0,
         });
       }
       _data = data;
@@ -62,7 +63,7 @@ export async function getPantheonContemporaries(birthYear, range, excludeName, l
   const from = birthYear - range;
   const to = birthYear + range;
   return data
-    .filter(p => p.birthyear >= from && p.birthyear <= to && p.name !== excludeName)
+    .filter(p => p.birthyear >= from && p.birthyear <= to && p.name !== excludeName && p.articleLanguages >= 25)
     .sort((a, b) => b.hpi - a.hpi)
     .map(p => ({
       id: `pantheon:${p.pageId}`,
