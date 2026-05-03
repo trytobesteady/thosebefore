@@ -66,6 +66,7 @@ const translations = {
     recentTimelines: "Recent Timelines",
     noRecentTimelines: "No timelines published yet.",
     publishMinPersons: "Add at least 2 persons to publish.",
+    showMore: (n) => `+${n} more`,
   },
   de: {
     appTitle: "Biografische Zeitleiste",
@@ -131,6 +132,7 @@ const translations = {
     recentTimelines: "Zuletzt veröffentlicht",
     noRecentTimelines: "Noch keine Zeitleisten veröffentlicht.",
     publishMinPersons: "Füge mindestens 2 Personen hinzu.",
+    showMore: (n) => `+${n} weitere`,
     relType: (type) => ({
       "Spouse": "Ehepartner",
       "Child": "Kind",

@@ -429,7 +429,7 @@ export default function PersonBlock({ person, startYear, pixelsPerYear, onAdd, e
                               className="text-xs rounded px-1.5 py-0.5 bg-base-200 text-base-content/40 hover:bg-base-300 hover:text-base-content/70 transition-colors"
                               onClick={(e) => { e.stopPropagation(); setContempLimit(l => l + CONTEMP_STEP); }}
                             >
-                              +{Math.min(CONTEMP_STEP, contempResults.length - contempLimit)} more
+                              {t.showMore(Math.min(CONTEMP_STEP, contempResults.length - contempLimit))}
                             </button>
                           )}
                         </>
