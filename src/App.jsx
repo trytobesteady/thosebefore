@@ -19,6 +19,10 @@ export default function App() {
   const { t, lang, setLang } = useLang();
   const [theme, setThemeState] = useState(readThemeCookie);
 
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
+
   function toggleTheme() {
     const next = theme === "light" ? "dark" : "light";
     document.cookie = `theme=${next};path=/;max-age=31536000`;
