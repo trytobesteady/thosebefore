@@ -4,6 +4,7 @@ import { useLang } from '../i18n';
 
 function timeAgo(iso, lang) {
   const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return lang === 'de' ? 'gerade eben' : 'just now';
   if (mins < 60) return lang === 'de' ? `vor ${mins}m` : `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return lang === 'de' ? `vor ${hrs}h` : `${hrs}h ago`;
